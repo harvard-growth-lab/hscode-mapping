@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets
+.env
+
+# Data (tracked via DVC or managed separately)
+data/
+
+# SLURM logs
+slurm_logs/
+
+# Output artifacts
+*.parquet
+*.csv
+*.npy
