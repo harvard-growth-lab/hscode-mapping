@@ -1,4 +1,4 @@
-# Linkages: Product-to-HS-Code Classifier
+# HS Code Classifier
 
 Takes a product description string and returns the best-matching Harmonized System (HS) trade codes.
 
