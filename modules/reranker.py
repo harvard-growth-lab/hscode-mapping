@@ -1,4 +1,10 @@
-"""Rerank a shortlist of HS code candidates using GPT."""
+"""Rerank a shortlist of HS code candidates using GPT.
+
+TODO: replace direct OpenAI API call in rerank_codes() with llm.call()
+      so the provider can be swapped without touching this file.
+      This module should only own RERANK_TOOL, format_table_for_llm(),
+      and the prompt string.
+"""
 
 import json
 

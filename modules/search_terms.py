@@ -1,4 +1,9 @@
-"""Generate HS-vocabulary search terms for a product string using Claude."""
+"""Generate HS-vocabulary search terms for a product string using Claude.
+
+TODO: replace direct Anthropic API call in generate_search_terms() with
+      llm.call() so the provider can be swapped without touching this file.
+      This module should only own TERM_GENERATION_TOOL and the prompt string.
+"""
 
 TERM_GENERATION_TOOL = {
     "name": "request_terms",
