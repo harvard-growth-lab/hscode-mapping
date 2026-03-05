@@ -3,6 +3,13 @@
 Combines embedding generation/loading (was embeddings.py) with index construction
 (was HSIndex.__init__ in retrieval.py). Everything about setting up the HS side
 happens here once at startup.
+
+TODO: descriptions are currently loaded from a static Excel file — we have a data
+source that provides up-to-date HS vintages, so load_hs_data() should be updated
+to pull from there instead.
+
+TODO: replace FAISS with a modern vector DB (e.g. Qdrant, LanceDB) for persistent
+storage and easier updates when descriptions change.
 """
 
 from pathlib import Path
