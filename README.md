@@ -66,9 +66,10 @@ modules/
 ├── config.py             # Settings dataclass: API keys, model names, paths, parameters
 ├── lookup_index.py       # Load HS descriptions, generate/load S-BERT embeddings, build FAISS index
 ├── translator.py         # Language detection and translation to English (langdetect)
-├── search_terms.py       # Claude: product string → HS-vocabulary search terms
+├── llm.py                # Unified LLM call interface (provider-agnostic, swap here)
+├── search_terms.py       # Prompt + tool schema for search term generation
 ├── retrieval.py          # Embed terms, search FAISS, aggregate and deduplicate
-├── reranker.py           # GPT: shortlist → top 2 HS codes + reasoning
+├── reranker.py           # Prompt + tool schema for reranking
 ├── splitter.py           # BERTopic clustering + stratified train/test split  [placeholder]
 ├── evaluator.py          # Accuracy metrics, chapter-level confusion matrix    [placeholder]
 └── labeler.py            # Label Studio export/import + ground truth management [placeholder]
@@ -118,6 +119,8 @@ The planned evaluation flow:
 | Embeddings | `dell-research-harvard/lt-un-data-fine-fine-en` (S-BERT, trade concordance fine-tune) |
 | Term generation | Claude 3.5 Haiku |
 | Reranking | GPT-4o-mini |
+
+Provider switching is isolated to `modules/llm.py`. Both term generation and reranking route through a single `call()` function there, so swapping to a different provider (or using one model for both) only requires changes in that file. The roadmap is to replace the current Anthropic/OpenAI branches with [LiteLLM](https://github.com/BerriAI/litellm) for a unified interface across providers.
 
 ## Notes
 
