@@ -23,13 +23,13 @@ class Settings:
         default_factory=lambda: os.environ["ANTHROPIC_API_KEY"]
     )
 
-    # Project root: defaults to 3 levels up from this file (src/linkages/config.py)
+    # Project root: defaults to 2 levels up from this file (modules/config.py)
     # Override with LINKAGES_PROJECT_ROOT env var for SLURM or non-standard layouts
     project_root: Path = field(
         default_factory=lambda: Path(
             os.environ.get(
                 "LINKAGES_PROJECT_ROOT",
-                str(Path(__file__).resolve().parent.parent.parent),
+                str(Path(__file__).resolve().parent.parent),
             )
         )
     )

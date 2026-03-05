@@ -8,8 +8,8 @@ Original: 1_hs_embeddings.py.
 import argparse
 from pathlib import Path
 
-from linkages.config import Settings
-from linkages.embeddings import generate_embeddings
+from modules.config import Settings
+from modules.lookup_index import generate_embeddings
 
 
 def main():

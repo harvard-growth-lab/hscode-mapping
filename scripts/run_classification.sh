@@ -15,4 +15,4 @@ export HF_HOME=/n/holylfs05/LABS/hausmann_lab/Lab/kdaryanani/.cache/huggingface
 cd /n/holylfs05/LABS/hausmann_lab/Lab/kdaryanani/linkages-pkg
 source .venv/bin/activate
 
-linkages-classify --checkpoint-path data/intermediate/checkpoint.parquet
+uv run python pipeline.py --checkpoint-path data/intermediate/checkpoint.parquet
