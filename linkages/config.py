@@ -1,6 +1,6 @@
 """Configuration management for the linkages pipeline.
 
-Loads API keys from .env and provides sensible path defaults.
+Loads environment variables from .env and provides shared defaults.
 All other modules import Settings from here.
 """
 
@@ -15,12 +15,10 @@ load_dotenv()
 
 @dataclass
 class Settings:
-    # API keys (from .env)
-    openai_api_key: str = field(
-        default_factory=lambda: os.environ["OPENAI_API_KEY"]
-    )
-    anthropic_api_key: str = field(
-        default_factory=lambda: os.environ["ANTHROPIC_API_KEY"]
+    # LLM configuration (from .env)
+    llm_api_key: str = field(default_factory=lambda: os.environ["LLM_API_KEY"])
+    llm_provider: str = field(
+        default_factory=lambda: os.environ.get("LLM_PROVIDER", "gemini").lower()
     )
 
     # Project root: defaults to 2 levels up from this file (modules/config.py)
@@ -36,8 +34,14 @@ class Settings:
 
     # Model configuration
     embedding_model_name: str = "dell-research-harvard/lt-un-data-fine-fine-en"
-    claude_model: str = "claude-3-5-haiku-latest"
-    gpt_model: str = "gpt-4o-mini"
+    term_generation_model: str = field(
+        default_factory=lambda: os.environ.get(
+            "TERM_GENERATION_MODEL", "gemini-2.5-flash"
+        )
+    )
+    reranker_model: str = field(
+        default_factory=lambda: os.environ.get("RERANKER_MODEL", "gemini-2.5-flash")
+    )
 
     # Pipeline parameters
     hs_sheet: str = "HS12"
@@ -69,3 +73,19 @@ class Settings:
     @property
     def base_df_path(self) -> Path:
         return self.intermediate_dir / "base_df.parquet"
+
+    @property
+    def openai_api_key(self) -> str:
+        return self.llm_api_key
+
+    @property
+    def anthropic_api_key(self) -> str:
+        return self.llm_api_key
+
+    @property
+    def claude_model(self) -> str:
+        return self.term_generation_model
+
+    @property
+    def gpt_model(self) -> str:
+        return self.reranker_model

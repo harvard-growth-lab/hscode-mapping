@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from modules.lookup_index import HSIndex, normalized_embeddings
+from linkages.lookup_index import HSIndex, normalized_embeddings
 
 
 def search(hs_index: HSIndex, query: str, top_k: int) -> pd.DataFrame:

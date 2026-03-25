@@ -44,7 +44,7 @@ flowchart TD
 ```
 
 **Stage 0 — Language detection** (`modules/translator.py`)
-Input text is detected for language. If not English it is translated before entering the pipeline.
+Input text is detected for language. Translation is not implemented on `main` yet; non-English text is currently passed through unchanged.
 
 **Stage 1 — Thesaurus / search term generation** (`modules/search_terms.py`)
 Claude receives the product string and optional context and generates 5-8 search terms drawn from the HS vocabulary — generic product class names that will match well in the embedding space.
@@ -66,23 +66,23 @@ modules/
 ├── config.py             # Settings dataclass: API keys, model names, paths, parameters
 ├── lookup_index.py       # Load HS descriptions, generate/load S-BERT embeddings, build FAISS index
 ├── translator.py         # Language detection and translation to English (langdetect)
-├── llm.py                # Unified LLM call interface (provider-agnostic, swap here)
 ├── search_terms.py       # Prompt + tool schema for search term generation
 ├── retrieval.py          # Embed terms, search FAISS, aggregate and deduplicate
-├── reranker.py           # Prompt + tool schema for reranking
-├── splitter.py           # BERTopic clustering + stratified train/test split  [placeholder]
-├── evaluator.py          # Accuracy metrics, chapter-level confusion matrix    [placeholder]
-└── labeler.py            # Label Studio export/import + ground truth management [placeholder]
+└── reranker.py           # Prompt + tool schema for reranking
 
 scripts/
-├── 0_load_data.py        # Pull article data from MongoDB → parquet (one-time)
-├── 1_generate_embeddings.py  # Encode HS descriptions → .npy (one-time)
-└── run_classification.sh     # SLURM job script
+└── 1_generate_embeddings.py  # Encode HS descriptions → .npy (one-time)
 
 data/
 ├── raw/                  # HSCodeandDescription.xlsx
-└── intermediate/         # hs12_4_embeddings.npy, base_df.parquet
+└── intermediate/         # hs12_4_embeddings.npy
 ```
+
+## Branches
+
+- `main` keeps the MVP classifier only: load HS data, retrieve candidates, rerank, and return top HS codes.
+- `evals` is for split construction, labeling, metrics, notebooks, and benchmark workflow.
+- `llm-upgrade` is for provider abstraction work, including making `search_terms.py` and `reranker.py` call through a shared LLM interface.
 
 ## Setup
 
@@ -104,14 +104,6 @@ Generate the embeddings once after placing the Excel file:
 uv run python scripts/1_generate_embeddings.py
 ```
 
-## Evaluation workflow (in progress)
-
-The planned evaluation flow:
-
-1. **Cluster** — `splitter.py` uses BERTopic to group product descriptions semantically, then produces a stratified train/test split so all product types are represented in both sets.
-2. **Label** — `labeler.py` exports unlabeled rows to Label Studio for annotation and imports completed labels back. Tracks label provenance (existing ground truth vs newly annotated).
-3. **Evaluate** — `evaluator.py` computes top-1 accuracy, top-2 accuracy (either of the two returned codes matches), and hierarchical accuracy at the 2-digit chapter level, plus a chapter-level confusion matrix.
-
 ## Models
 
 | Role | Model |
@@ -120,7 +112,7 @@ The planned evaluation flow:
 | Term generation | Claude 3.5 Haiku |
 | Reranking | GPT-4o-mini |
 
-Provider switching is isolated to `modules/llm.py`. Both term generation and reranking route through a single `call()` function there, so swapping to a different provider (or using one model for both) only requires changes in that file. The roadmap is to replace the current Anthropic/OpenAI branches with [LiteLLM](https://github.com/BerriAI/litellm) for a unified interface across providers.
+On `main`, term generation and reranking still call Anthropic and OpenAI directly. Provider-agnostic routing is planned for the `llm-upgrade` branch rather than documented as completed here.
 
 ## Notes
 
