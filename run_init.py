@@ -8,7 +8,12 @@ Usage:
   uv run run_init.py --force      # rebuild even if it exists
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import fire
 
@@ -16,19 +21,16 @@ from linkages.init_lookup_index import build_index, save_hs_chapters
 
 INDEX_PATH = Path("data/intermediate/hs12_4_index.parquet")
 CHAPTERS_PATH = Path("data/intermediate/hs2_chapters.parquet")
-DEFAULT_MODEL = "dell-research-harvard/lt-un-data-fine-fine-en"
+EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
 
 
-def init(
-    model: str = DEFAULT_MODEL,
-    force: bool = False,
-) -> None:
+def init(force: bool = False) -> None:
     """Generate HS code index and chapter reference. Skips if already built unless --force."""
     save_hs_chapters(output_path=CHAPTERS_PATH, force=force)
     build_index(
         output_path=INDEX_PATH,
         level=4,
-        model_name=model,
+        model_name=EMBEDDING_MODEL,
         force=force,
     )
 

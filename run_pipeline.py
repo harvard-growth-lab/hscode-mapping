@@ -7,6 +7,7 @@ Pipeline flow for one row:
   4. Generate HS-vocabulary search terms via LLM
 """
 
+import os
 import warnings
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="translators")
@@ -26,7 +27,11 @@ from linkages.translator import detect_language, translate_eng
 
 INDEX_PATH = Path("data/intermediate/hs12_4_index.parquet")
 CHAPTERS_PATH = Path("data/intermediate/hs2_chapters.parquet")
-DEFAULT_MODEL = "google/gemini-2.5-flash-lite"
+
+# --- Models (defaults from .env, overridable via CLI flags) ---
+EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
+SEARCH_TERM_MODEL = os.environ["SEARCH_TERM_MODEL"]
+RERANKER_MODEL = os.environ["RERANKER_MODEL"]
 
 
 def load_sample_row(
@@ -51,7 +56,7 @@ def translate_text(text: str) -> dict[str, str]:
     }
 
 
-def process_row(row: dict, model: str = DEFAULT_MODEL) -> dict:
+def process_row(row: dict) -> dict:
     """Full pipeline for one CSV row: build query, translate, generate search terms."""
     # extract product description and context fields from the row
     query_input = build_query(row)
@@ -64,7 +69,7 @@ def process_row(row: dict, model: str = DEFAULT_MODEL) -> dict:
         query=result["english_text"],
         context=result["context"],
         hs_chapters=hs_chapters,
-        model=model,
+        model=SEARCH_TERM_MODEL,
     )
     result["search_terms"] = terms
     return result
@@ -73,11 +78,10 @@ def process_row(row: dict, model: str = DEFAULT_MODEL) -> dict:
 def classify(
     csv_path: str = "data/raw/ecuador_sample.csv",
     row_index: int = 1,
-    model: str = DEFAULT_MODEL,
 ) -> None:
     """Classify a single row from the sample CSV."""
     row = load_sample_row(csv_path=csv_path, row_index=row_index)
-    print(process_row(row, model=model))
+    print(process_row(row))
 
 
 if __name__ == "__main__":

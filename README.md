@@ -72,7 +72,7 @@ data/
 
 ```bash
 uv sync
-cp .env.example .env  # fill in GOOGLE_API_KEY, HF_TOKEN, and Atlas DB credentials
+cp .env.example .env  # fill in API keys, Atlas DB credentials, and model choices
 ```
 
 ### Initialize the lookup index
@@ -94,11 +94,15 @@ uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 
 ## Models
 
-| Role | Model |
-|---|---|
-| Embeddings | `dell-research-harvard/lt-un-data-fine-fine-en` (S-BERT, trade concordance fine-tune) |
-| Term generation | Gemini 2.5 Flash Lite (configurable via `--model`) |
-| Reranking | Gemini 2.5 Flash Lite (configurable) |
+All models are configured in `.env` (see `.env.example`):
+
+| `.env` variable | Role | Default |
+|---|---|---|
+| `EMBEDDING_MODEL` | S-BERT embeddings for FAISS index | `dell-research-harvard/lt-un-data-fine-fine-en` |
+| `SEARCH_TERM_MODEL` | LLM for search term generation | `google/gemini-2.5-flash-lite` |
+| `RERANKER_MODEL` | LLM for reranking candidates | `google/gemini-2.5-flash-lite` |
+
+LLM models use `instructor.from_provider()`, so any supported provider string works (e.g. `anthropic/claude-sonnet-4-20250514`, `cohere/command-r-plus`).
 
 ## Future improvements
 
