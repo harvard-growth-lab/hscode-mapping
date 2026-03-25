@@ -2,82 +2,61 @@
 
 Takes a product description string and returns the best-matching Harmonized System (HS) trade codes.
 
-```python
-from pipeline import Classifier
-
-clf = Classifier()  # loads models once
-result = clf.classify("solar panel inverter", context="...article text...")
-# {
-#   "code_first":      "8504",
-#   "desc_first":      "Electrical transformers, static converters and inductors",
-#   "code_second":     "8541",
-#   "desc_second":     "Semiconductor devices",
-#   "reason":          "...",
-#   "detected_lang":   "en",
-#   "claude_terms":    ["inverter", "power converter", ...],
-#   "retrieved_codes": ["8504: ...", "8541: ...", ...]
-# }
-```
-
 ## How it works
 
 ```mermaid
 flowchart TD
-    subgraph setup ["Setup (once)"]
-        HS[("HSCodeandDescription.xlsx")]
-        EMB["lookup_index.py\nS-BERT embeddings"]
-        IDX[("FAISS index\n~1,900 HS codes")]
-        HS --> EMB --> IDX
+    subgraph setup ["Setup (run once)"]
+        DB[("Atlas DB\nclassification.product_hs12")]
+        EMB["init_lookup_index.py\nS-BERT embeddings"]
+        IDX[("hs12_4_index.parquet\ncode + description + embedding")]
+        DB --> EMB --> IDX
     end
 
-    subgraph classify [".classify(text, context)"]
-        A["product string"] --> T["translator.py\nlanguage detection"]
+    subgraph classify ["run_pipeline.py"]
+        A["CSV row"] --> BQ["build_query.py\nextract product description"]
+        BQ --> T["translator.py\nlanguage detection"]
         T -->|not English| TR["translate to English"]
         T -->|already English| ST
-        TR --> ST["search_terms.py\nClaude Haiku\n→ 5-8 search terms"]
+        TR --> ST["search_terms.py\n→ 5-8 search terms"]
         ST --> R["retrieval.py\nembed each term\n+ FAISS search"]
         IDX --> R
         R --> AGG["aggregate +\ndeduplicate\n~25 candidates"]
-        AGG --> RR["reranker.py\nGPT-4o-mini"]
+        AGG --> RR["reranker.py"]
         RR --> OUT["top 2 HS codes\n+ reasoning"]
     end
 ```
 
-**Stage 0 — Language detection** (`modules/translator.py`)
-Input text is detected for language. Translation now runs through `linkages/translator.py` using Lingua for detection and the `translators` package with the Google backend for English translation.
+**Stage 0 — Language detection** (`linkages/translator.py`)
+Input text is detected for language using Lingua. Non-English text is translated via the `translators` package (Google backend).
 
-**Stage 1 — Thesaurus / search term generation** (`modules/search_terms.py`)
-Claude receives the product string and optional context and generates 5-8 search terms drawn from the HS vocabulary — generic product class names that will match well in the embedding space.
+**Stage 1 — Thesaurus / search term generation** (`linkages/search_terms.py`)
+The LLM receives the product string and optional context and generates 5-8 search terms drawn from the HS vocabulary — generic product class names that will match well in the embedding space.
 
-**Stage 2 — Retrieval** (`modules/retrieval.py`)
+**Stage 2 — Retrieval** (`linkages/retrieval.py`)
 The original query and each generated term are independently embedded and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
 
-**Stage 3 — Reranking** (`modules/reranker.py`)
-GPT-4o-mini receives the shortlist and selects the top 2 HS codes with a short justification.
-
-The FAISS index is built once when `Classifier()` is initialised and reused across all `.classify()` calls.
+**Stage 3 — Reranking** (`linkages/reranker.py`)
+The LLM receives the shortlist and selects the top 2 HS codes with a short justification.
 
 ## Project structure
 
 ```
-pipeline.py               # Stage runner for translate / terms / retrieve / rerank / classify
-run_pipeline.py           # Minimal row-to-query translator entry point
+run_init.py               # One-time setup: build lookup index from Atlas DB
+run_pipeline.py           # Classify a single CSV row (Fire CLI)
 
 linkages/
+├── init_lookup_index.py  # DB connection, S-BERT encoding, save index parquet
 ├── build_query.py        # Build one classifier query from one raw row
-├── config.py             # Settings dataclass: provider, API key, paths, parameters
-├── lookup_index.py       # Load HS descriptions, generate/load S-BERT embeddings, build FAISS index
+├── config.py             # Settings: provider, API key, paths, parameters
 ├── translator.py         # Lingua language detection + Google translation backend
 ├── search_terms.py       # Prompt + tool schema for search term generation
-├── retrieval.py          # Embed terms, search FAISS, aggregate and deduplicate
+├── retrieval.py          # Load index parquet, FAISS search, aggregate and deduplicate
 └── reranker.py           # Prompt + tool schema for reranking
 
-scripts/
-└── 1_generate_embeddings.py  # Encode HS descriptions → .npy (one-time)
-
 data/
-├── raw/                  # HSCodeandDescription.xlsx and sample row data
-└── intermediate/         # hs12_4_embeddings.npy
+├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
+└── intermediate/         # hs12_4_index.parquet (code + description + embedding)
 ```
 
 ## Branches
@@ -90,29 +69,24 @@ data/
 
 ```bash
 uv sync
-cp .env.example .env  # fill in OPENAI_API_KEY and ANTHROPIC_API_KEY
+cp .env.example .env  # fill in LLM_API_KEY and Atlas DB credentials
 ```
 
-### Required data files
+### Initialize the lookup index
 
-```
-data/raw/HSCodeandDescription.xlsx        # HS code reference table (sheet "HS12")
-data/intermediate/hs12_4_embeddings.npy   # pre-computed S-BERT embeddings
-```
-
-Generate the embeddings once after placing the Excel file:
+Pulls HS code descriptions from the Atlas DB, generates S-BERT embeddings, and saves everything to a single parquet:
 
 ```bash
-uv run python scripts/1_generate_embeddings.py
+uv run run_init.py            # skips if parquet already exists
+uv run run_init.py --force    # rebuild
 ```
 
-### Pipeline stage runner
-
-`pipeline.py` was changed from an end-to-end-only interface into a stage runner. It can now execute `translate`, `terms`, `retrieve`, `rerank`, or `classify` for one input string, or for one sample row from `data/raw/ecuador_sample.csv`.
+### Classify a row
 
 ```bash
-uv run python pipeline.py --stage translate --row 1
-uv run python pipeline.py --stage classify --text "solar panel inverter"
+uv run run_pipeline.py                          # default: row 1 from ecuador_sample
+uv run run_pipeline.py --row_index 5            # different row
+uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 ```
 
 ## Models
@@ -120,14 +94,13 @@ uv run python pipeline.py --stage classify --text "solar panel inverter"
 | Role | Model |
 |---|---|
 | Embeddings | `dell-research-harvard/lt-un-data-fine-fine-en` (S-BERT, trade concordance fine-tune) |
-| Term generation | Claude 3.5 Haiku |
-| Reranking | GPT-4o-mini |
-
-On `main`, term generation and reranking still call Anthropic and OpenAI directly. Provider-agnostic routing is planned for the `llm-upgrade` branch rather than documented as completed here.
+| Term generation | Gemini 2.5 Flash (configurable) |
+| Reranking | Gemini 2.5 Flash (configurable) |
 
 ## Future improvements
 
 - **DeepL for translation (optional):** The current translator uses the `translators` package with the Google backend. A potential upgrade is to use the DeepL API directly (free plan available) for better translation quality, especially on trade/product descriptions.
+- **Vector DB (optional):** FAISS works well at the current scale (~1,200 HS4 codes). A managed vector DB like Qdrant or LanceDB would only be worth it if we need persistence, filtering, or incremental updates at much larger scale.
 
 ## Notes
 
@@ -135,4 +108,5 @@ This is a rewrite of an earlier monolithic script. Key differences:
 
 - **FAISS built once** — the original rebuilt the index on every query (~48,000 times per full run)
 - **No hardcoded secrets** — API keys now loaded from `.env`
+- **HS data from Atlas DB** — no longer depends on a local Excel file
 - **Flat structure** — original was a single 440-line script; now split into focused modules

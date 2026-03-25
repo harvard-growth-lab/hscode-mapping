@@ -1,35 +1,71 @@
 """Embed search terms, query the FAISS index, aggregate and deduplicate results."""
 
+from pathlib import Path
+
+import faiss
 import numpy as np
-import pandas as pd
+import polars as pl
+from sentence_transformers import SentenceTransformer
 
-from linkages.lookup_index import HSIndex, normalized_embeddings
+from linkages.init_lookup_index import normalized_embeddings
 
 
-def search(hs_index: HSIndex, query: str, top_k: int) -> pd.DataFrame:
+# --- Index loading ---
+
+
+def load_index(index_path: Path) -> tuple[pl.DataFrame, faiss.IndexFlatIP]:
+    """Load the parquet index and build a FAISS index from the embedding column."""
+    if not index_path.exists():
+        raise FileNotFoundError(f"Index not found at {index_path} — run run_init.py first")
+
+    full = pl.read_parquet(index_path)
+
+    # extract embeddings into a numpy array and build FAISS index
+    embeddings = np.stack(full["embedding"].to_list()).astype("float32")
+    index = faiss.IndexFlatIP(embeddings.shape[1])
+    index.add(embeddings)
+
+    # keep only code + description for lookups
+    data = full.select("code", "description")
+
+    print(f"Index loaded: {len(data)} codes, {embeddings.shape[1]}d embeddings")
+    return data, index
+
+
+# --- Search ---
+
+
+def search(
+    data: pl.DataFrame,
+    index: faiss.IndexFlatIP,
+    model: SentenceTransformer,
+    query: str,
+    top_k: int,
+) -> pl.DataFrame:
     """Embed a single query string and return the top_k nearest HS codes."""
-    top_k = int(top_k)
-    query_embedding = normalized_embeddings([query], hs_index.model).astype("float32")
-    _, indices = hs_index.index.search(query_embedding, top_k)
-    return hs_index.data.iloc[indices[0]]
+    query_embedding = normalized_embeddings([query], model).astype("float32")
+    _, indices = index.search(query_embedding, int(top_k))
+    return data[indices[0].tolist()]
 
 
 def multi_search(
-    hs_index: HSIndex,
+    data: pl.DataFrame,
+    index: faiss.IndexFlatIP,
+    model: SentenceTransformer,
     query: str,
     terms: list[str],
     top_k_total: int,
     top_k_bert: int,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """Search the original query plus each synonym term, then aggregate and deduplicate.
 
     The query gets top_k_bert slots; remaining budget is split evenly across terms.
     """
-    results = [search(hs_index, query, top_k_bert)]
+    results = [search(data, index, model, query, top_k_bert)]
 
     top_k_each = (top_k_total - top_k_bert) // len(terms)
     for term in terms:
-        results.append(search(hs_index, term, max(top_k_each, 1)))
+        results.append(search(data, index, model, term, max(top_k_each, 1)))
 
-    concatenated = pd.concat(results, ignore_index=True)
-    return concatenated.drop_duplicates(subset=["Code"])
+    concatenated = pl.concat(results)
+    return concatenated.unique(subset=["code"])

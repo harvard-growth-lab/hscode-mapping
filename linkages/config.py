@@ -67,8 +67,8 @@ class Settings:
         return self.raw_dir / "HSCodeandDescription.xlsx"
 
     @property
-    def embeddings_path(self) -> Path:
-        return self.intermediate_dir / "hs12_4_embeddings.npy"
+    def index_path(self) -> Path:
+        return self.intermediate_dir / "hs12_4_index.parquet"
 
     @property
     def base_df_path(self) -> Path:
