@@ -10,6 +10,10 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
 
+# silence noisy third-party loggers
+for name in ("httpx", "faiss.loader", "sentence_transformers", "instructor"):
+    logging.getLogger(name).setLevel(logging.WARNING)
+
 import fire
 import polars as pl
 

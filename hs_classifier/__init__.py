@@ -58,7 +58,7 @@ def init_classifier() -> dict:
     logger.info("Loading HS chapters and FAISS index...")
     hs_chapters = load_hs_chapters(CHAPTERS_PATH)
     index_data, index_codes, faiss_index = load_index(INDEX_PATH)
-    embed_model = SentenceTransformer(EMBEDDING_MODEL)
+    embed_model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
     logger.info("Classifier ready")
 
     return {
