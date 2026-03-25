@@ -44,7 +44,7 @@ flowchart TD
 ```
 
 **Stage 0 — Language detection** (`modules/translator.py`)
-Input text is detected for language. Translation is not implemented on `main` yet; non-English text is currently passed through unchanged.
+Input text is detected for language. Translation now runs through `linkages/translator.py` using Lingua for detection and the `translators` package with the Google backend for English translation.
 
 **Stage 1 — Thesaurus / search term generation** (`modules/search_terms.py`)
 Claude receives the product string and optional context and generates 5-8 search terms drawn from the HS vocabulary — generic product class names that will match well in the embedding space.
@@ -60,12 +60,14 @@ The FAISS index is built once when `Classifier()` is initialised and reused acro
 ## Project structure
 
 ```
-pipeline.py               # Classifier class — the public interface
+pipeline.py               # Stage runner for translate / terms / retrieve / rerank / classify
+run_pipeline.py           # Minimal row-to-query translator entry point
 
-modules/
-├── config.py             # Settings dataclass: API keys, model names, paths, parameters
+linkages/
+├── build_query.py        # Build one classifier query from one raw row
+├── config.py             # Settings dataclass: provider, API key, paths, parameters
 ├── lookup_index.py       # Load HS descriptions, generate/load S-BERT embeddings, build FAISS index
-├── translator.py         # Language detection and translation to English (langdetect)
+├── translator.py         # Lingua language detection + Google translation backend
 ├── search_terms.py       # Prompt + tool schema for search term generation
 ├── retrieval.py          # Embed terms, search FAISS, aggregate and deduplicate
 └── reranker.py           # Prompt + tool schema for reranking
@@ -74,7 +76,7 @@ scripts/
 └── 1_generate_embeddings.py  # Encode HS descriptions → .npy (one-time)
 
 data/
-├── raw/                  # HSCodeandDescription.xlsx
+├── raw/                  # HSCodeandDescription.xlsx and sample row data
 └── intermediate/         # hs12_4_embeddings.npy
 ```
 
@@ -102,6 +104,15 @@ Generate the embeddings once after placing the Excel file:
 
 ```bash
 uv run python scripts/1_generate_embeddings.py
+```
+
+### Pipeline stage runner
+
+`pipeline.py` was changed from an end-to-end-only interface into a stage runner. It can now execute `translate`, `terms`, `retrieve`, `rerank`, or `classify` for one input string, or for one sample row from `data/raw/ecuador_sample.csv`.
+
+```bash
+uv run python pipeline.py --stage translate --row 1
+uv run python pipeline.py --stage classify --text "solar panel inverter"
 ```
 
 ## Models
