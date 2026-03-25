@@ -65,10 +65,6 @@ def generate_search_terms(
         f"HS chapters:\n{hs_list}"
     )
 
-    print("--- PROMPT ---")
-    print(prompt)
-    print("--- END PROMPT ---")
-
     terms = client.create(
         response_model=SearchTerms,
         messages=[{"role": "user", "content": prompt}],

@@ -16,11 +16,12 @@ flowchart TD
     end
 
     subgraph classify ["run_pipeline.py"]
-        A["CSV row"] --> BQ["build_query.py\nextract product description"]
+        A["CSV row"] --> BQ["build_query.py\nextract product description\n+ shipping context"]
         BQ --> T["translator.py\nlanguage detection"]
         T -->|not English| TR["translate to English"]
         T -->|already English| ST
-        TR --> ST["search_terms.py\n→ 5-8 search terms"]
+        TR --> ST["search_terms.py\nLLM + HS2 chapters\n→ 5-8 search terms"]
+        CH --> ST
         ST --> R["retrieval.py\nembed each term\n+ FAISS search"]
         IDX --> R
         R --> AGG["aggregate +\ndeduplicate\n~25 candidates"]
