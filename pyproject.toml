@@ -20,6 +20,9 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "connectorx>=0.4.5",
     "pyarrow>=23.0.1",
+    "instructor>=1.14.5",
+    "google-genai>=1.68.0",
+    "jsonref>=1.1.0",
 ]
 
 [dependency-groups]

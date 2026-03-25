@@ -31,7 +31,7 @@ flowchart TD
 Input text is detected for language using Lingua. Non-English text is translated via the `translators` package (Google backend).
 
 **Stage 1 — Thesaurus / search term generation** (`linkages/search_terms.py`)
-The LLM receives the product string and optional context and generates 5-8 search terms drawn from the HS vocabulary — generic product class names that will match well in the embedding space.
+The LLM receives the product string, optional context, and the full HS description list, and generates 5-8 search terms — generic product class names that will match well in the embedding space. Uses Instructor with a Pydantic model for structured output. Provider-agnostic via `instructor.from_provider()`.
 
 **Stage 2 — Retrieval** (`linkages/retrieval.py`)
 The original query and each generated term are independently embedded and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
@@ -50,7 +50,7 @@ linkages/
 ├── build_query.py        # Build one classifier query from one raw row
 ├── config.py             # Settings: provider, API key, paths, parameters
 ├── translator.py         # Lingua language detection + Google translation backend
-├── search_terms.py       # Prompt + tool schema for search term generation
+├── search_terms.py       # Pydantic model + Instructor for search term generation
 ├── retrieval.py          # Load index parquet, FAISS search, aggregate and deduplicate
 └── reranker.py           # Prompt + tool schema for reranking
 
@@ -69,7 +69,7 @@ data/
 
 ```bash
 uv sync
-cp .env.example .env  # fill in LLM_API_KEY and Atlas DB credentials
+cp .env.example .env  # fill in GOOGLE_API_KEY and Atlas DB credentials
 ```
 
 ### Initialize the lookup index
@@ -94,13 +94,14 @@ uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 | Role | Model |
 |---|---|
 | Embeddings | `dell-research-harvard/lt-un-data-fine-fine-en` (S-BERT, trade concordance fine-tune) |
-| Term generation | Gemini 2.5 Flash (configurable) |
-| Reranking | Gemini 2.5 Flash (configurable) |
+| Term generation | Gemini 2.5 Flash Lite (configurable via `--model`) |
+| Reranking | Gemini 2.5 Flash Lite (configurable) |
 
 ## Future improvements
 
 - **DeepL for translation (optional):** The current translator uses the `translators` package with the Google backend. A potential upgrade is to use the DeepL API directly (free plan available) for better translation quality, especially on trade/product descriptions.
 - **Vector DB (optional):** FAISS works well at the current scale (~1,200 HS4 codes). A managed vector DB like Qdrant or LanceDB would only be worth it if we need persistence, filtering, or incremental updates at much larger scale.
+- **Short HS names in search term prompt:** Currently the full 1,226 long descriptions are passed to the LLM. Using short names instead would reduce tokens and may improve term matching.
 
 ## Notes
 
