@@ -7,8 +7,10 @@ Usage:
     result = classify_row(row, classifier)
 """
 
+import logging
 import os
 import warnings
+from dataclasses import dataclass
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="translators")
 
@@ -18,7 +20,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import polars as pl
 from sentence_transformers import SentenceTransformer
 
 from hs_classifier.build_query import build_query
@@ -27,19 +28,38 @@ from hs_classifier.retrieval import load_index, multi_search
 from hs_classifier.search_terms import generate_search_terms, load_hs_chapters
 from hs_classifier.translator import detect_language, translate_eng
 
+logger = logging.getLogger(__name__)
+
 INDEX_PATH = Path("data/intermediate/hs12_4_index.parquet")
 CHAPTERS_PATH = Path("data/intermediate/hs2_chapters.parquet")
 
 EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
 SEARCH_TERM_MODEL = os.environ["SEARCH_TERM_MODEL"]
 RERANKER_MODEL = os.environ["RERANKER_MODEL"]
+TOP_K_TOTAL = int(os.environ.get("TOP_K_TOTAL", 25))
+TOP_K_BERT = int(os.environ.get("TOP_K_BERT", 10))
+
+
+@dataclass
+class ClassificationResult:
+    """Result of classifying a single product row."""
+
+    code_first: str
+    desc_first: str
+    code_second: str
+    desc_second: str
+    reason: str
+    search_terms: list[str]
+    detected_language: str
 
 
 def init_classifier() -> dict:
     """Load all heavy resources once. Pass the result to classify_row()."""
+    logger.info("Loading HS chapters and FAISS index...")
     hs_chapters = load_hs_chapters(CHAPTERS_PATH)
     index_data, index_codes, faiss_index = load_index(INDEX_PATH)
     embed_model = SentenceTransformer(EMBEDDING_MODEL)
+    logger.info("Classifier ready")
 
     return {
         "hs_chapters": hs_chapters,
@@ -50,18 +70,7 @@ def init_classifier() -> dict:
     }
 
 
-def _translate_text(text: str) -> dict[str, str]:
-    """Detect language and translate to English."""
-    detected_lang = detect_language(text)
-    english_text = translate_eng(text, from_lang=detected_lang)
-    return {
-        "input_text": text,
-        "detected_language": detected_lang,
-        "english_text": english_text,
-    }
-
-
-def classify_row(row: dict, classifier: dict) -> dict:
+def classify_row(row: dict, classifier: dict) -> ClassificationResult:
     """Classify one CSV row using preloaded resources.
 
     Args:
@@ -69,39 +78,49 @@ def classify_row(row: dict, classifier: dict) -> dict:
         classifier: Output of init_classifier().
 
     Returns:
-        Dict with translation info, search terms, shortlist, top 2 codes, and reasoning.
+        ClassificationResult with top 2 codes, descriptions, reasoning,
+        search terms, and detected language.
     """
     # extract product description and context fields from the row
     query_input = build_query(row)
-    # detect language and translate the product description
-    result = _translate_text(query_input.query)
-    result["context"] = query_input.context
+    # detect language and translate to English (skips translation if already English)
+    detected_lang = detect_language(query_input.query)
+    english_text = translate_eng(query_input.query, from_lang=detected_lang)
+    logger.info(f"Language: {detected_lang} | Query: {english_text[:80]}")
     # generate search terms from the translated text
     terms = generate_search_terms(
-        query=result["english_text"],
-        context=result["context"],
+        query=english_text,
+        context=query_input.context,
         hs_chapters=classifier["hs_chapters"],
         model=SEARCH_TERM_MODEL,
     )
-    result["search_terms"] = terms
+    logger.info(f"Search terms: {terms}")
     # retrieve candidate HS codes via FAISS
     shortlist = multi_search(
         data=classifier["index_data"],
         codes=classifier["index_codes"],
         index=classifier["faiss_index"],
         model=classifier["embed_model"],
-        query=result["english_text"],
+        query=english_text,
         terms=terms,
-        top_k_total=25,
-        top_k_bert=10,
+        top_k_total=TOP_K_TOTAL,
+        top_k_bert=TOP_K_BERT,
     )
-    result["shortlist"] = shortlist
+    logger.info(f"Retrieved {len(shortlist)} candidate codes")
     # rerank candidates and pick top 2
     reranked = rerank_codes(
         shortlist=shortlist,
-        query=result["english_text"],
-        context=result["context"],
+        query=english_text,
+        context=query_input.context,
         model=RERANKER_MODEL,
     )
-    result.update(reranked)
-    return result
+
+    return ClassificationResult(
+        code_first=reranked["code_first"],
+        desc_first=reranked["desc_first"],
+        code_second=reranked["code_second"],
+        desc_second=reranked["desc_second"],
+        reason=reranked["reason"],
+        search_terms=terms,
+        detected_language=detected_lang,
+    )

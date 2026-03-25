@@ -6,6 +6,10 @@ Usage:
   uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 """
 
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
+
 import fire
 import polars as pl
 

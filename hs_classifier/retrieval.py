@@ -1,5 +1,6 @@
 """Embed search terms, query the FAISS index, aggregate and deduplicate results."""
 
+import logging
 from pathlib import Path
 
 import faiss
@@ -8,6 +9,8 @@ import polars as pl
 from sentence_transformers import SentenceTransformer
 
 from hs_classifier.init_lookup_index import normalized_embeddings
+
+logger = logging.getLogger(__name__)
 
 
 # --- Index loading ---
@@ -37,7 +40,7 @@ def load_index(index_path: Path) -> tuple[pl.DataFrame, list[str], faiss.IndexFl
     # keep only code + description for lookups
     data = full.select("code", "description")
 
-    print(f"Index loaded: {len(data)} codes, {embeddings.shape[1]}d embeddings")
+    logger.info(f"Index loaded: {len(data)} codes, {embeddings.shape[1]}d embeddings")
     return data, codes, index
 
 

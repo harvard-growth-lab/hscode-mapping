@@ -9,6 +9,7 @@ Flow:
   3. Save code, description, and embedding vector to .parquet
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 # --- Database ---
@@ -57,13 +60,13 @@ def normalized_embeddings(texts: list[str], model) -> np.ndarray:
 def save_hs_chapters(output_path: Path, force: bool = False) -> None:
     """Save HS2 chapter descriptions to a parquet (used as LLM prompt context)."""
     if output_path.exists() and not force:
-        print(f"HS chapters already exist at {output_path}, skipping")
+        logger.info(f"HS chapters already exist at {output_path}, skipping")
         return
 
     data = load_hs_data(level=2)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     data.write_parquet(output_path)
-    print(f"Saved {len(data)} HS chapters to {output_path}")
+    logger.info(f"Saved {len(data)} HS chapters to {output_path}")
 
 
 def build_index(
@@ -74,11 +77,11 @@ def build_index(
 ) -> None:
     """Generate and save HS code + description + embeddings to a single parquet."""
     if output_path.exists() and not force:
-        print(f"Index already exists at {output_path}, skipping (use force=True to rebuild)")
+        logger.info(f"Index already exists at {output_path}, skipping (use force=True to rebuild)")
         return
 
     data = load_hs_data(level)
-    print(f"Generating embeddings for {len(data)} HS level-{level} codes from Atlas DB")
+    logger.info(f"Generating embeddings for {len(data)} HS level-{level} codes from Atlas DB")
 
     model = SentenceTransformer(model_name)
     embeddings = normalized_embeddings(data["description"].to_list(), model)
@@ -90,4 +93,4 @@ def build_index(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     data.write_parquet(output_path)
-    print(f"Saved index ({len(data)} codes) to {output_path}")
+    logger.info(f"Saved index ({len(data)} codes) to {output_path}")
