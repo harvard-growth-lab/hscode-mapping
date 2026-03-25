@@ -16,6 +16,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "lingua-language-detector>=1.4.2",
     "bertopic>=0.16.0",
+    "fire>=0.7.1",
 ]
 
 [dependency-groups]
