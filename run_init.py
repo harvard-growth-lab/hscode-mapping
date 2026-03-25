@@ -12,22 +12,22 @@ from pathlib import Path
 
 import fire
 
-from linkages.init_lookup_index import build_index
+from linkages.init_lookup_index import build_index, save_hs_chapters
 
-DEFAULT_OUTPUT = Path("data/intermediate/hs12_4_index.parquet")
+INDEX_PATH = Path("data/intermediate/hs12_4_index.parquet")
+CHAPTERS_PATH = Path("data/intermediate/hs2_chapters.parquet")
 DEFAULT_MODEL = "dell-research-harvard/lt-un-data-fine-fine-en"
 
 
 def init(
-    output: str = str(DEFAULT_OUTPUT),
-    level: int = 4,
     model: str = DEFAULT_MODEL,
     force: bool = False,
 ) -> None:
-    """Generate HS code index. Skips if already built unless --force is set."""
+    """Generate HS code index and chapter reference. Skips if already built unless --force."""
+    save_hs_chapters(output_path=CHAPTERS_PATH, force=force)
     build_index(
-        output_path=Path(output),
-        level=level,
+        output_path=INDEX_PATH,
+        level=4,
         model_name=model,
         force=force,
     )

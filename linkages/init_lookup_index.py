@@ -36,7 +36,7 @@ def _build_db_uri() -> str:
 def load_hs_data(level: int = 4) -> pl.DataFrame:
     """Load HS code descriptions from the Atlas database, ordered by code."""
     query = (
-        "SELECT code, name_en AS description "
+        "SELECT code, name_en AS description, name_short_en AS short_name "
         "FROM classification.product_hs12 "
         f"WHERE product_level = {level} "
         "ORDER BY code"
@@ -52,6 +52,18 @@ def normalized_embeddings(texts: list[str], model) -> np.ndarray:
     embeddings = model.encode(texts, show_progress_bar=False)
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     return embeddings / norms
+
+
+def save_hs_chapters(output_path: Path, force: bool = False) -> None:
+    """Save HS2 chapter descriptions to a parquet (used as LLM prompt context)."""
+    if output_path.exists() and not force:
+        print(f"HS chapters already exist at {output_path}, skipping")
+        return
+
+    data = load_hs_data(level=2)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    data.write_parquet(output_path)
+    print(f"Saved {len(data)} HS chapters to {output_path}")
 
 
 def build_index(

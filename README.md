@@ -10,7 +10,9 @@ flowchart TD
         DB[("Atlas DB\nclassification.product_hs12")]
         EMB["init_lookup_index.py\nS-BERT embeddings"]
         IDX[("hs12_4_index.parquet\ncode + description + embedding")]
+        CH[("hs2_chapters.parquet\n97 HS chapter descriptions")]
         DB --> EMB --> IDX
+        DB --> CH
     end
 
     subgraph classify ["run_pipeline.py"]
@@ -30,8 +32,8 @@ flowchart TD
 **Stage 0 — Language detection** (`linkages/translator.py`)
 Input text is detected for language using Lingua. Non-English text is translated via the `translators` package (Google backend).
 
-**Stage 1 — Thesaurus / search term generation** (`linkages/search_terms.py`)
-The LLM receives the product string, optional context, and the full HS description list, and generates 5-8 search terms — generic product class names that will match well in the embedding space. Uses Instructor with a Pydantic model for structured output. Provider-agnostic via `instructor.from_provider()`.
+**Stage 1 — Search term generation** (`linkages/search_terms.py`)
+The LLM receives the product string, shipping context, and the 97 HS2 chapter descriptions as guidance. It generates 5-8 search terms using HS vocabulary that will match well in the embedding space. Uses Instructor with a Pydantic model for structured output. Provider-agnostic via `instructor.from_provider()`.
 
 **Stage 2 — Retrieval** (`linkages/retrieval.py`)
 The original query and each generated term are independently embedded and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
@@ -56,7 +58,7 @@ linkages/
 
 data/
 ├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
-└── intermediate/         # hs12_4_index.parquet (code + description + embedding)
+└── intermediate/         # hs12_4_index.parquet + hs2_chapters.parquet
 ```
 
 ## Branches
@@ -69,12 +71,12 @@ data/
 
 ```bash
 uv sync
-cp .env.example .env  # fill in GOOGLE_API_KEY and Atlas DB credentials
+cp .env.example .env  # fill in GOOGLE_API_KEY, HF_TOKEN, and Atlas DB credentials
 ```
 
 ### Initialize the lookup index
 
-Pulls HS code descriptions from the Atlas DB, generates S-BERT embeddings, and saves everything to a single parquet:
+Pulls HS code descriptions from the Atlas DB, generates S-BERT embeddings, and saves two parquets (HS4 index with embeddings + HS2 chapters for prompt context):
 
 ```bash
 uv run run_init.py            # skips if parquet already exists
@@ -101,7 +103,6 @@ uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 
 - **DeepL for translation (optional):** The current translator uses the `translators` package with the Google backend. A potential upgrade is to use the DeepL API directly (free plan available) for better translation quality, especially on trade/product descriptions.
 - **Vector DB (optional):** FAISS works well at the current scale (~1,200 HS4 codes). A managed vector DB like Qdrant or LanceDB would only be worth it if we need persistence, filtering, or incremental updates at much larger scale.
-- **Short HS names in search term prompt:** Currently the full 1,226 long descriptions are passed to the LLM. Using short names instead would reduce tokens and may improve term matching.
 
 ## Notes
 

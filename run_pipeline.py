@@ -21,10 +21,11 @@ import fire
 import polars as pl
 
 from linkages.build_query import build_query
-from linkages.search_terms import generate_search_terms, load_hs_descriptions
+from linkages.search_terms import generate_search_terms, load_hs_chapters
 from linkages.translator import detect_language, translate_eng
 
 INDEX_PATH = Path("data/intermediate/hs12_4_index.parquet")
+CHAPTERS_PATH = Path("data/intermediate/hs2_chapters.parquet")
 DEFAULT_MODEL = "google/gemini-2.5-flash-lite"
 
 
@@ -58,11 +59,11 @@ def process_row(row: dict, model: str = DEFAULT_MODEL) -> dict:
     result = translate_text(query_input.query)
     result["context"] = query_input.context
     # generate search terms from the translated text
-    hs_descriptions = load_hs_descriptions(INDEX_PATH)
+    hs_chapters = load_hs_chapters(CHAPTERS_PATH)
     terms = generate_search_terms(
         query=result["english_text"],
         context=result["context"],
-        hs_descriptions=hs_descriptions,
+        hs_chapters=hs_chapters,
         model=model,
     )
     result["search_terms"] = terms
