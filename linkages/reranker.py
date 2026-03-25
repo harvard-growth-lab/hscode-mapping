@@ -45,12 +45,14 @@ def rerank_codes(
     client = instructor.from_provider(model)
     formatted_codes = format_shortlist(shortlist)
 
+    context_line = f"Shipping context: '{context}'\n" if context else ""
+
     prompt = (
         f"You are an expert trade classifier. Given a product description, pick the "
         f"two most relevant HS codes from the shortlist below.\n\n"
         f"Product: '{query}'\n"
-        f"Shipping context: '{context}'\n\n"
-        f"Work through your reasoning step by step, then return your top 2 HS code "
+        f"{context_line}\n"
+        f"Work through your reasoning step by step, then return your top 2 HS codes "
         f"picks and a 50-word justification. If none match, write 'None of the "
         f"provided codes' for each label.\n\n"
         f"Candidate codes:\n" + "\n".join(formatted_codes)

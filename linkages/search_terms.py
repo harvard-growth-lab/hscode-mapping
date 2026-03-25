@@ -54,9 +54,11 @@ def generate_search_terms(
 
     hs_list = "\n".join(f"- {ch}" for ch in hs_chapters)
 
+    context_line = f"Shipping context: '{context}'\n" if context else ""
+
     prompt = (
         f"I have a trade product described as: '{query}'\n"
-        f"Shipping context: '{context}'\n\n"
+        f"{context_line}\n"
         f"What general class of products does this belong to? Below are the 97 chapters "
         f"of the Harmonized System (HS) trade classification.\n\n"
         f"Return 5-8 terms from this list that this product could fall under. "

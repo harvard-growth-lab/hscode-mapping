@@ -40,7 +40,7 @@ The LLM receives the product string, shipping context, and the 97 HS2 chapter de
 The original query and each generated term are independently embedded and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
 
 **Stage 3 — Reranking** (`linkages/reranker.py`)
-The LLM receives the shortlist and selects the top 2 HS codes with a short justification.
+The LLM receives the shortlist and selects the top 2 HS codes with a short justification. Uses Instructor with a Pydantic model for structured output. Provider-agnostic via `instructor.from_provider()`.
 
 ## Project structure
 
@@ -51,11 +51,10 @@ run_pipeline.py           # Classify a single CSV row (Fire CLI)
 linkages/
 ├── init_lookup_index.py  # DB connection, S-BERT encoding, save index parquet
 ├── build_query.py        # Build one classifier query from one raw row
-├── config.py             # Settings: provider, API key, paths, parameters
 ├── translator.py         # Lingua language detection + Google translation backend
-├── search_terms.py       # Pydantic model + Instructor for search term generation
+├── search_terms.py       # LLM search term generation (Instructor + Pydantic)
 ├── retrieval.py          # Load index parquet, FAISS search, aggregate and deduplicate
-└── reranker.py           # Prompt + tool schema for reranking
+└── reranker.py           # LLM reranking of candidates (Instructor + Pydantic)
 
 data/
 ├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
@@ -64,9 +63,8 @@ data/
 
 ## Branches
 
-- `main` keeps the MVP classifier only: load HS data, retrieve candidates, rerank, and return top HS codes.
+- `main` keeps the MVP classifier: load HS data, retrieve candidates, rerank, and return top HS codes. Provider abstraction (Instructor + Pydantic) is complete.
 - `evals` is for split construction, labeling, metrics, notebooks, and benchmark workflow.
-- `llm-upgrade` is for provider abstraction work, including making `search_terms.py` and `reranker.py` call through a shared LLM interface.
 
 ## Setup
 
