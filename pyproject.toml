@@ -1,23 +1,16 @@
 [project]
-name = "linkages"
+name = "hs-classifier"
 version = "0.1.0"
 description = "LLM-powered product-to-HS-code classification pipeline"
 requires-python = ">=3.12"
 dependencies = [
-    "anthropic>=0.57.1",
-    "openai>=1.96.0",
     "faiss-cpu>=1.11.0",
     "sentence-transformers>=5.0.0",
     "polars>=1.31.0",
-    "pandas>=2.3.0",
-    "openpyxl>=3.1.5",
     "python-dotenv>=1.0.0",
     "translators>=5.9.9",
-    "tqdm>=4.67.1",
     "lingua-language-detector>=1.4.2",
-    "bertopic>=0.16.0",
     "fire>=0.7.1",
-    "psycopg2-binary>=2.9.11",
     "connectorx>=0.4.5",
     "pyarrow>=23.0.1",
     "instructor>=1.14.5",
@@ -27,4 +20,3 @@ dependencies = [
 
 [dependency-groups]
 dev = ["ipykernel>=6.29.5"]
-scripts = ["pymongo>=4.0.0"]

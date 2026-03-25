@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 from sentence_transformers import SentenceTransformer
 
-from linkages.init_lookup_index import normalized_embeddings
+from hs_classifier.init_lookup_index import normalized_embeddings
 
 
 # --- Index loading ---

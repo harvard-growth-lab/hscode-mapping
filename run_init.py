@@ -17,7 +17,7 @@ load_dotenv()
 
 import fire
 
-from linkages.init_lookup_index import build_index, save_hs_chapters
+from hs_classifier.init_lookup_index import build_index, save_hs_chapters
 
 INDEX_PATH = Path("data/intermediate/hs12_4_index.parquet")
 CHAPTERS_PATH = Path("data/intermediate/hs2_chapters.parquet")

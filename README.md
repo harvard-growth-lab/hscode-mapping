@@ -30,16 +30,16 @@ flowchart TD
     end
 ```
 
-**Stage 0 — Language detection** (`linkages/translator.py`)
+**Stage 0 — Language detection** (`hs_classifier/translator.py`)
 Input text is detected for language using Lingua. Non-English text is translated via the `translators` package (Google backend).
 
-**Stage 1 — Search term generation** (`linkages/search_terms.py`)
+**Stage 1 — Search term generation** (`hs_classifier/search_terms.py`)
 The LLM receives the product string, shipping context, and the 97 HS2 chapter descriptions as guidance. It generates 5-8 search terms using HS vocabulary that will match well in the embedding space. Uses Instructor with a Pydantic model for structured output. Provider-agnostic via `instructor.from_provider()`.
 
-**Stage 2 — Retrieval** (`linkages/retrieval.py`)
+**Stage 2 — Retrieval** (`hs_classifier/retrieval.py`)
 The original query and each generated term are independently embedded and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
 
-**Stage 3 — Reranking** (`linkages/reranker.py`)
+**Stage 3 — Reranking** (`hs_classifier/reranker.py`)
 The LLM receives the shortlist and selects the top 2 HS codes with a short justification. Uses Instructor with a Pydantic model for structured output. Provider-agnostic via `instructor.from_provider()`.
 
 ## Project structure
@@ -48,7 +48,7 @@ The LLM receives the shortlist and selects the top 2 HS codes with a short justi
 run_init.py               # One-time setup: build lookup index from Atlas DB
 run_pipeline.py           # Classify a single CSV row (Fire CLI)
 
-linkages/
+hs_classifier/
 ├── init_lookup_index.py  # DB connection, S-BERT encoding, save index parquet
 ├── build_query.py        # Build one classifier query from one raw row
 ├── translator.py         # Lingua language detection + Google translation backend
@@ -82,12 +82,21 @@ uv run run_init.py            # skips if parquet already exists
 uv run run_init.py --force    # rebuild
 ```
 
-### Classify a row
+### Classify a row (CLI)
 
 ```bash
 uv run run_pipeline.py                          # default: row 1 from ecuador_sample
 uv run run_pipeline.py --row_index 5            # different row
 uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
+```
+
+### As a package
+
+```python
+from hs_classifier import init_classifier, classify_row
+
+classifier = init_classifier()
+result = classify_row(row, classifier)
 ```
 
 ## Models
