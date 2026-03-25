@@ -125,6 +125,10 @@ uv run python pipeline.py --stage classify --text "solar panel inverter"
 
 On `main`, term generation and reranking still call Anthropic and OpenAI directly. Provider-agnostic routing is planned for the `llm-upgrade` branch rather than documented as completed here.
 
+## Future improvements
+
+- **DeepL for translation (optional):** The current translator uses the `translators` package with the Google backend. A potential upgrade is to use the DeepL API directly (free plan available) for better translation quality, especially on trade/product descriptions.
+
 ## Notes
 
 This is a rewrite of an earlier monolithic script. Key differences:

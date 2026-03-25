@@ -7,6 +7,10 @@ Pipeline flow for one row:
   4. Return the result
 """
 
+import warnings
+
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="translators")
+
 import fire
 import polars as pl
 
