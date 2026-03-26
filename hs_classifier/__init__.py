@@ -38,6 +38,7 @@ SEARCH_TERM_MODEL = os.environ["SEARCH_TERM_MODEL"]
 RERANKER_MODEL = os.environ["RERANKER_MODEL"]
 TOP_K_TOTAL = int(os.environ.get("TOP_K_TOTAL", 25))
 TOP_K_BERT = int(os.environ.get("TOP_K_BERT", 10))
+LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", 0.1))
 
 
 @dataclass
@@ -97,6 +98,7 @@ def classify_row(row: dict, classifier: dict) -> ClassificationResult:
         context=query_input.context,
         hs_chapters=classifier["hs_chapters"],
         model=SEARCH_TERM_MODEL,
+        temperature=LLM_TEMPERATURE,
     )
     logger.info(f"Search terms: {terms}")
     # retrieve candidate HS codes via FAISS
@@ -117,6 +119,7 @@ def classify_row(row: dict, classifier: dict) -> ClassificationResult:
         query=english_text,
         context=query_input.context,
         model=RERANKER_MODEL,
+        temperature=LLM_TEMPERATURE,
     )
 
     return ClassificationResult(

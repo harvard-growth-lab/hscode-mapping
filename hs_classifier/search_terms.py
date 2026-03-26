@@ -38,6 +38,7 @@ def generate_search_terms(
     context: str,
     hs_chapters: list[str],
     model: str,
+    temperature: float = 0.1,
 ) -> list[str]:
     """Generate 5-8 HS-vocabulary search terms for a product description.
 
@@ -70,6 +71,7 @@ def generate_search_terms(
     terms = client.create(
         response_model=SearchTerms,
         messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
     )
 
     return terms.to_list()

@@ -30,6 +30,7 @@ def rerank_codes(
     query: str,
     context: str,
     model: str,
+    temperature: float = 0.1,
 ) -> dict:
     """Use an LLM to select the top 2 HS codes from the retrieved shortlist.
 
@@ -61,6 +62,7 @@ def rerank_codes(
     result = client.create(
         response_model=RerankResult,
         messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
     )
 
     # look up descriptions from the shortlist
