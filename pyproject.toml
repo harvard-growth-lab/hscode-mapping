@@ -30,6 +30,7 @@ anthropic = ["anthropic>=0.86.0"]
 google = ["google-genai>=1.68.0"]
 openai = ["openai>=1.82.0"]
 cohere = ["cohere>=5.15.0"]
+notebook = ["ipykernel>=6.29.5", "notebook>=7.0.0"]
 all = ["anthropic>=0.86.0", "google-genai>=1.68.0", "openai>=1.82.0", "cohere>=5.15.0"]
 
 [dependency-groups]

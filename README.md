@@ -36,6 +36,12 @@ pip install "hs-classifier[google] @ git+https://github.com/karandaryanani/panji
 cp .env.example .env   # fill in API keys, Atlas DB credentials, and model choices
 ```
 
+If you want to run [`example.ipynb`](example.ipynb), install the notebook extra:
+
+```bash
+pip install "hs-classifier[google,notebook] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
+```
+
 `INTERMEDIATE_DATA_DIR` controls where `init_index()` writes its parquet artifacts and where `init_classifier()` reads them from. Default: `data/intermediate`.
 
 ### 2. Setup

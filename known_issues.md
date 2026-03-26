@@ -14,6 +14,7 @@
 - `init_index()` creates the configured `INTERMEDIATE_DATA_DIR` if it does not exist and writes parquet artifacts there. This is now configurable, but still a write-time side effect users should be aware of.
 - `generate_search_terms()` is assumed to return at least one term. The retrieval code now guards against an empty list, but an empty term set still reduces recall because only the raw query search runs.
 - `_build_db_uri()` in `hs_classifier/init_lookup_index.py` interpolates credentials directly into the PostgreSQL URI. If the username or password contains reserved URL characters like `@`, `:`, or `/`, the DB connection can fail. Proper fix: URL-encode credentials before building the URI.
+- `example.ipynb` is slightly stale relative to the current package API. In particular, its evaluation section still refers to `confusion_matrix` instead of `correctness_summary`, and it still uses Polars directly even though the README examples are now pandas-first.
 
 ## Connection Errors
 
