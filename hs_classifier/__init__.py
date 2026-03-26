@@ -5,7 +5,14 @@ Usage:
 
     init_index()              # one-time: build lookup index from Atlas DB
     classifier = init_classifier()
-    result = classify_row(row, classifier)
+
+    result = classify_row(row, classifier)                    # uses .env defaults
+    result = classify_row(row, classifier,                    # override per call
+        search_term_model="google/gemini-2.5-flash-lite",
+        reranker_model="anthropic/claude-haiku-4-5-20251001",
+        temperature=0.2,
+        top_k_total=50,
+    )
 """
 
 import logging
@@ -92,17 +99,40 @@ def init_classifier() -> dict:
     }
 
 
-def classify_row(row: dict, classifier: dict) -> ClassificationResult:
+def classify_row(
+    row: dict,
+    classifier: dict,
+    search_term_model: str | None = None,
+    reranker_model: str | None = None,
+    temperature: float | None = None,
+    top_k_total: int | None = None,
+    top_k_bert: int | None = None,
+) -> ClassificationResult:
     """Classify one CSV row using preloaded resources.
+
+    All keyword arguments override the .env defaults for this call only,
+    making it easy to compare models or tune retrieval without editing config.
 
     Args:
         row: A single row from the CSV as a dict.
         classifier: Output of init_classifier().
+        search_term_model: LLM for search term generation (default: SEARCH_TERM_MODEL from .env).
+        reranker_model: LLM for reranking (default: RERANKER_MODEL from .env).
+        temperature: LLM temperature (default: LLM_TEMPERATURE from .env).
+        top_k_total: Total FAISS candidates to retrieve (default: TOP_K_TOTAL from .env).
+        top_k_bert: Candidates allocated to the raw query (default: TOP_K_BERT from .env).
 
     Returns:
         ClassificationResult with top 2 codes, descriptions, reasoning,
         search terms, and detected language.
     """
+    # resolve defaults from .env
+    _search_term_model = search_term_model or SEARCH_TERM_MODEL
+    _reranker_model = reranker_model or RERANKER_MODEL
+    _temperature = temperature if temperature is not None else LLM_TEMPERATURE
+    _top_k_total = top_k_total if top_k_total is not None else TOP_K_TOTAL
+    _top_k_bert = top_k_bert if top_k_bert is not None else TOP_K_BERT
+
     # extract product description and context fields from the row
     query_input = build_query(row)
     # detect language and translate to English (skips translation if already English)
@@ -118,8 +148,8 @@ def classify_row(row: dict, classifier: dict) -> ClassificationResult:
         query=english_text,
         context=query_input.context,
         hs_chapters=classifier["hs_chapters"],
-        model=SEARCH_TERM_MODEL,
-        temperature=LLM_TEMPERATURE,
+        model=_search_term_model,
+        temperature=_temperature,
     )
     logger.info(f"Search terms: {terms}")
     # retrieve candidate HS codes via FAISS
@@ -130,8 +160,8 @@ def classify_row(row: dict, classifier: dict) -> ClassificationResult:
         model=classifier["embed_model"],
         query=english_text,
         terms=terms,
-        top_k_total=TOP_K_TOTAL,
-        top_k_bert=TOP_K_BERT,
+        top_k_total=_top_k_total,
+        top_k_bert=_top_k_bert,
     )
     logger.info(f"Retrieved {len(shortlist)} candidate codes")
     # rerank candidates and pick top 2
@@ -139,8 +169,8 @@ def classify_row(row: dict, classifier: dict) -> ClassificationResult:
         shortlist=shortlist,
         query=english_text,
         context=query_input.context,
-        model=RERANKER_MODEL,
-        temperature=LLM_TEMPERATURE,
+        model=_reranker_model,
+        temperature=_temperature,
     )
 
     return ClassificationResult(
