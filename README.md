@@ -165,6 +165,7 @@ data/
 
 - **Evaluation pipeline:** Train/test split on labeled data to measure classification accuracy (top-1, top-k hit rate) and guide tuning of retrieval parameters, prompts, and model choices.
 - **Configurable top-N results:** The reranker currently returns exactly 2 codes. Making this configurable (e.g. top 5) gives downstream consumers more options for filtering or ensembling.
+- **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
 - **Provider extras:** `anthropic` and `google-genai` are both hard dependencies today. Restructuring as optional extras (`pip install hs-classifier[anthropic]`) would keep installs lighter.
 - **Batch classification:** `classify_row()` processes one row at a time. A `classify_batch()` that reuses the FAISS index and batches LLM calls would be significantly faster for bulk runs.
 - **Result caching:** Repeated queries currently hit the LLM every time. Caching search terms and reranker results would reduce cost and latency for duplicate or near-duplicate inputs.
