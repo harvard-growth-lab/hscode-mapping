@@ -18,10 +18,10 @@ classifier = init_classifier()
 row = {"product_description": "frozen shrimp", "container_description": "20ft reefer"}
 result = classify_row(row, classifier)
 
-result["code_first"]   # e.g. "0306"
-result["desc_first"]   # "Crustaceans; ..."
-result["code_second"]  # e.g. "1605"
-result["reason"]       # LLM justification
+result.code_first    # e.g. "0306"
+result.desc_first    # "Crustaceans; ..."
+result.code_second   # e.g. "1605"
+result.reason        # LLM justification
 ```
 
 ### CLI
@@ -34,23 +34,50 @@ uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 
 ## Configuration
 
-All configuration lives in `.env` (see `.env.example`):
+All configuration lives in `.env` (see `.env.example` for annotated defaults).
 
-**API keys**
-- `GOOGLE_API_KEY` — for Gemini models
-- `COHERE_API_KEY` — optional, for Cohere models
-- `HF_TOKEN` — for S-BERT model downloads
-- Atlas DB credentials (`ATLAS_HOST`, `ATLAS_PORT`, `ATLAS_USER`, `ATLAS_PASSWORD`, `ATLAS_DB`)
+### Database
 
-**Models**
+| Variable | Description |
+|---|---|
+| `ATLAS_HOST` | PostgreSQL host for HS code data |
+| `ATLAS_PORT` | PostgreSQL port (default: 5432) |
+| `ATLAS_USER` | Database username |
+| `ATLAS_PASSWORD` | Database password |
+| `ATLAS_DB` | Database name |
 
-| `.env` variable | Role | Default |
+### LLM providers
+
+Only the API key for your chosen provider is required. Install the corresponding package if not already present.
+
+| Provider | API key variable | Example model string | Package |
+|---|---|---|---|
+| Google Gemini | `GOOGLE_API_KEY` | `google/gemini-2.5-flash-lite` | `google-genai` (included) |
+| Anthropic | `ANTHROPIC_API_KEY` | `anthropic/claude-sonnet-4-20250514` | `anthropic` (included) |
+| Cohere | `COHERE_API_KEY` | `cohere/command-r-plus` | `pip install cohere` |
+
+LLM models use `instructor.from_provider()` — see [Instructor docs](https://python.useinstructor.com/) for the full list of supported providers.
+
+### Models
+
+| Variable | Role | Default |
 |---|---|---|
-| `EMBEDDING_MODEL` | S-BERT embeddings for FAISS index | `dell-research-harvard/lt-un-data-fine-fine-en` |
-| `SEARCH_TERM_MODEL` | LLM for search term generation | `google/gemini-2.5-flash-lite` |
-| `RERANKER_MODEL` | LLM for reranking candidates | `google/gemini-2.5-flash-lite` |
+| `EMBEDDING_MODEL` | S-BERT model for encoding HS descriptions and search queries into vectors | `dell-research-harvard/lt-un-data-fine-fine-en` |
+| `SEARCH_TERM_MODEL` | LLM that generates 5-8 HS-vocabulary search terms from the product description | `google/gemini-2.5-flash-lite` |
+| `RERANKER_MODEL` | LLM that picks the top 2 HS codes from the retrieval shortlist | `google/gemini-2.5-flash-lite` |
 
-LLM models use `instructor.from_provider()`, so any supported provider string works (e.g. `anthropic/claude-sonnet-4-20250514`, `cohere/command-r-plus`).
+### Other
+
+| Variable | Description |
+|---|---|
+| `HF_TOKEN` | Hugging Face token for downloading the S-BERT model |
+
+### Retrieval parameters
+
+| Variable | Default | Description |
+|---|---|---|
+| `TOP_K_TOTAL` | 25 | Total FAISS candidates retrieved across all searches. Higher = more candidates for the reranker (better recall, costlier reranking). |
+| `TOP_K_BERT` | 10 | How many of those go to the original query. The rest are split evenly across the LLM-generated search terms. Higher = more weight on the raw query vs generated terms. |
 
 ## How it works
 
@@ -81,16 +108,16 @@ flowchart TD
 ```
 
 **Stage 0 — Language detection** (`hs_classifier/translator.py`)
-Input text is detected for language using Lingua. Non-English text is translated via the `translators` package (Google backend).
+Input text is detected for language using Lingua. Non-English text is translated via the `translators` package (Google backend). If already English, translation is skipped automatically.
 
 **Stage 1 — Search term generation** (`hs_classifier/search_terms.py`)
-The LLM receives the product string, shipping context, and the 97 HS2 chapter descriptions as guidance. It generates 5-8 search terms using HS vocabulary that will match well in the embedding space.
+The LLM receives the product string, shipping context (if available), and the 97 HS2 chapter descriptions as guidance. It generates 5-8 search terms using HS vocabulary that will match well in the embedding space.
 
 **Stage 2 — Retrieval** (`hs_classifier/retrieval.py`)
-The original query and each generated term are independently embedded and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
+The original query and each generated term are independently embedded with S-BERT and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
 
 **Stage 3 — Reranking** (`hs_classifier/reranker.py`)
-The LLM receives the shortlist and selects the top 2 HS codes with a short justification.
+The LLM receives the candidate shortlist and selects the top 2 HS codes with a short justification. Context is included in the prompt when available.
 
 ## Project structure
 

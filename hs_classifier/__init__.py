@@ -86,7 +86,11 @@ def classify_row(row: dict, classifier: dict) -> ClassificationResult:
     # detect language and translate to English (skips translation if already English)
     detected_lang = detect_language(query_input.query)
     english_text = translate_eng(query_input.query, from_lang=detected_lang)
-    logger.info(f"Language: {detected_lang} | Query: {english_text[:80]}")
+    if detected_lang != "en":
+        logger.info(f"Language: {detected_lang} | Original: {query_input.query[:80]}")
+        logger.info(f"Translated: {english_text[:80]}")
+    else:
+        logger.info(f"Language: en | Query: {english_text[:80]}")
     # generate search terms from the translated text
     terms = generate_search_terms(
         query=english_text,
