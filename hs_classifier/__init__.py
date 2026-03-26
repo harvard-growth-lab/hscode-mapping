@@ -15,10 +15,11 @@ Usage:
     )
 """
 
+import json
 import logging
 import os
 import warnings
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="translators")
 
@@ -54,13 +55,17 @@ LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", 0.1))
 class ClassificationResult:
     """Result of classifying a single product row."""
 
-    code_first: str
-    desc_first: str
-    code_second: str
-    desc_second: str
+    codes: list[str]
+    descriptions: list[str]
     reason: str
     search_terms: list[str]
     detected_language: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    def __str__(self) -> str:
+        return json.dumps(asdict(self), indent=2, ensure_ascii=False)
 
 
 def init_index(force: bool = False) -> None:
@@ -107,6 +112,7 @@ def classify_row(
     temperature: float | None = None,
     top_k_total: int | None = None,
     top_k_bert: int | None = None,
+    top_n: int = 2,
 ) -> ClassificationResult:
     """Classify one CSV row using preloaded resources.
 
@@ -121,9 +127,10 @@ def classify_row(
         temperature: LLM temperature (default: LLM_TEMPERATURE from .env).
         top_k_total: Total FAISS candidates to retrieve (default: TOP_K_TOTAL from .env).
         top_k_bert: Candidates allocated to the raw query (default: TOP_K_BERT from .env).
+        top_n: Number of top HS codes to return (default: 2).
 
     Returns:
-        ClassificationResult with top 2 codes, descriptions, reasoning,
+        ClassificationResult with top N codes, descriptions, reasoning,
         search terms, and detected language.
     """
     # resolve defaults from .env
@@ -164,20 +171,19 @@ def classify_row(
         top_k_bert=_top_k_bert,
     )
     logger.info(f"Retrieved {len(shortlist)} candidate codes")
-    # rerank candidates and pick top 2
+    # rerank candidates and pick top N
     reranked = rerank_codes(
         shortlist=shortlist,
         query=english_text,
         context=query_input.context,
         model=_reranker_model,
         temperature=_temperature,
+        top_n=top_n,
     )
 
     return ClassificationResult(
-        code_first=reranked["code_first"],
-        desc_first=reranked["desc_first"],
-        code_second=reranked["code_second"],
-        desc_second=reranked["desc_second"],
+        codes=reranked["codes"],
+        descriptions=reranked["descriptions"],
         reason=reranked["reason"],
         search_terms=terms,
         detected_language=detected_lang,

@@ -51,7 +51,7 @@ result = classify_row(
     {"product_description": "frozen shrimp", "container_description": "20ft reefer"},
     classifier,
 )
-print(result.code_first, result.desc_first)
+print(result.codes[0], result.descriptions[0])
 ```
 
 ### 3. Create an eval sample
@@ -91,8 +91,7 @@ for row in labeled.iter_rows(named=True):
     result = classify_row(row, classifier)
     results.append({
         "code_true": row["hs_code"],
-        "code_first": result.code_first,
-        "code_second": result.code_second,
+        **{f"code_{i+1}": c for i, c in enumerate(result.codes)},
     })
 
 results_df = pl.DataFrame(results)
@@ -115,8 +114,7 @@ for config in configs:
         r = classify_row(row, classifier, **config)
         results.append({
             "code_true": row["hs_code"],
-            "code_first": r.code_first,
-            "code_second": r.code_second,
+            **{f"code_{i+1}": c for i, c in enumerate(r.codes)},
         })
     report = evaluation_report(pl.DataFrame(results), truth_col="code_true")
     # ... compare reports
@@ -134,8 +132,7 @@ for row in df.iter_rows(named=True):
     result = classify_row(row, classifier, **best_config)
     all_results.append({
         **row,
-        "hs_first": result.code_first,
-        "hs_second": result.code_second,
+        **{f"hs_{i+1}": c for i, c in enumerate(result.codes)},
         "reason": result.reason,
     })
 
@@ -179,7 +176,7 @@ Install the extra for your provider (see [Installation](#installation)) and set 
 |---|---|---|---|
 | `EMBEDDING_MODEL` | S-BERT model for encoding HS descriptions and queries | No (rebuild index) | `dell-research-harvard/lt-un-data-fine-fine-en` |
 | `SEARCH_TERM_MODEL` | LLM that generates search terms from product descriptions | `search_term_model=` | `google/gemini-2.5-flash-lite` |
-| `RERANKER_MODEL` | LLM that picks the top 2 HS codes from candidates | `reranker_model=` | `google/gemini-2.5-flash-lite` |
+| `RERANKER_MODEL` | LLM that picks the top N HS codes from candidates | `reranker_model=` | `google/gemini-2.5-flash-lite` |
 
 ### Retrieval parameters
 
@@ -261,10 +258,9 @@ data/
 
 ## Future improvements
 
-1. **Configurable top-N results:** The reranker currently returns exactly 2 codes. Making this configurable (e.g. top 5) gives downstream consumers more options for filtering or ensembling.
-2. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
-3. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
-4. **Code tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
+1. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
+2. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
+3. **Code tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
 
 **Nice to have:**
 - **Batch classification:** `classify_row()` processes one row at a time. A `classify_batch()` that batches LLM calls would be faster for bulk runs.

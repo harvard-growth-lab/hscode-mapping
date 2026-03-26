@@ -6,7 +6,7 @@ import polars as pl
 def evaluation_report(
     df: pl.DataFrame,
     truth_col: str = "code_true",
-    pred_cols: list[str] = ["code_first", "code_second"],
+    pred_cols: list[str] = ["code_1", "code_2"],
 ) -> dict:
     """Compute top-1, top-k, and chapter accuracy. Returns a summary dict."""
     pred_col = pred_cols[0]
