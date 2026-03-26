@@ -17,8 +17,9 @@ data/
 # SLURM logs
 slurm_logs/
 
-# Notebooks
+# Notebooks (except example)
 *.ipynb
+!example.ipynb
 
 # Output artifacts
 *.parquet
