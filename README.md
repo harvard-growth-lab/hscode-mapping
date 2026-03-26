@@ -36,6 +36,8 @@ pip install "hs-classifier[google] @ git+https://github.com/karandaryanani/panji
 cp .env.example .env   # fill in API keys, Atlas DB credentials, and model choices
 ```
 
+`INTERMEDIATE_DATA_DIR` controls where `init_index()` writes its parquet artifacts and where `init_classifier()` reads them from. Default: `data/intermediate`.
+
 ### 2. Setup
 
 ```python
@@ -43,6 +45,13 @@ from hs_classifier import init_index, init_classifier, classify_row
 
 init_index()                     # one-time: build FAISS index from Atlas DB (skips if exists)
 classifier = init_classifier()   # load heavy resources (FAISS index, S-BERT model)
+```
+
+You can also override the path per call:
+
+```python
+init_index(intermediate_data_dir="artifacts/hs")
+classifier = init_classifier(intermediate_data_dir="artifacts/hs")
 ```
 
 ### 3. Create an eval sample
@@ -61,7 +70,7 @@ model = SentenceTransformer(os.environ["EMBEDDING_MODEL"], local_files_only=True
 sample = prepare_eval_sample(
     df, text_col="product_description", model=model, sample_frac=0.02,
 )
-sample.write_csv("data/raw/my_data_sample_2pct.csv")
+sample.write_csv("data/intermediate/samples/my_data_sample_2pct.csv")
 ```
 
 ### 4. Label the sample
@@ -75,7 +84,7 @@ Run the classifier on each labeled row, collect predictions alongside ground tru
 ```python
 from hs_classifier.evaluator import evaluation_report
 
-labeled = pl.read_csv("data/raw/my_data_sample_2pct_labeled.csv")
+labeled = pl.read_csv("data/intermediate/samples/my_data_sample_2pct_labeled.csv")
 
 results = []
 for row in labeled.iter_rows(named=True):
@@ -140,7 +149,7 @@ uv run run_pipeline.py                          # classify a single row
 uv run run_pipeline.py --row_index 5            # different row
 uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 
-uv run run_splitter.py --csv_path data/raw/my_data.csv --sample_frac 0.05  # create eval sample
+uv run run_splitter.py --csv_path data/raw/my_data.csv --sample_frac 0.05  # writes to INTERMEDIATE_DATA_DIR/samples by default
 ```
 
 ## Configuration
@@ -182,6 +191,9 @@ Install the extra for your provider (see [Installation](#installation)) and set 
 | Variable | Description |
 |---|---|
 | `HF_TOKEN` | Hugging Face token for downloading the S-BERT model |
+| `INTERMEDIATE_DATA_DIR` | Directory for generated parquet artifacts such as `hs12_4_index.parquet` and `hs2_chapters.parquet` |
+
+`run_splitter.py` also uses `INTERMEDIATE_DATA_DIR` for its default sample output path, writing to `INTERMEDIATE_DATA_DIR/samples/` unless `--output_path` is provided.
 
 ## How it works
 
@@ -261,7 +273,7 @@ hs_classifier/
 
 data/
 ├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
-└── intermediate/         # hs12_4_index.parquet + hs2_chapters.parquet
+└── intermediate/         # parquet artifacts + default splitter outputs under samples/
 ```
 
 ## Future improvements

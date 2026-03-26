@@ -40,15 +40,35 @@ from hs_classifier.translator import detect_language, translate_eng
 
 logger = logging.getLogger(__name__)
 
-INDEX_PATH = Path("data/intermediate/hs12_4_index.parquet")
-CHAPTERS_PATH = Path("data/intermediate/hs2_chapters.parquet")
 
-EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
-SEARCH_TERM_MODEL = os.environ["SEARCH_TERM_MODEL"]
-RERANKER_MODEL = os.environ["RERANKER_MODEL"]
-TOP_K_TOTAL = int(os.environ.get("TOP_K_TOTAL", 25))
-TOP_K_BERT = int(os.environ.get("TOP_K_BERT", 10))
-LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", 0.1))
+def _require_env(name: str) -> str:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        raise RuntimeError(
+            f"Missing required environment variable '{name}'. "
+            "Set it in your environment or .env before using hs_classifier."
+        )
+    return value
+
+
+def _runtime_config() -> dict[str, str | int | float]:
+    return {
+        "embedding_model": _require_env("EMBEDDING_MODEL"),
+        "search_term_model": _require_env("SEARCH_TERM_MODEL"),
+        "reranker_model": _require_env("RERANKER_MODEL"),
+        "intermediate_data_dir": os.environ.get("INTERMEDIATE_DATA_DIR", "data/intermediate"),
+        "top_k_total": int(os.environ.get("TOP_K_TOTAL", 25)),
+        "top_k_bert": int(os.environ.get("TOP_K_BERT", 10)),
+        "llm_temperature": float(os.environ.get("LLM_TEMPERATURE", 0.1)),
+    }
+
+
+def _intermediate_paths(intermediate_data_dir: str | Path | None = None) -> tuple[Path, Path]:
+    base_dir = Path(intermediate_data_dir or _runtime_config()["intermediate_data_dir"])
+    return (
+        base_dir / "hs12_4_index.parquet",
+        base_dir / "hs2_chapters.parquet",
+    )
 
 
 @dataclass
@@ -68,31 +88,40 @@ class ClassificationResult:
         return json.dumps(asdict(self), indent=2, ensure_ascii=False)
 
 
-def init_index(force: bool = False) -> None:
+def init_index(
+    force: bool = False,
+    intermediate_data_dir: str | Path | None = None,
+) -> None:
     """Build the HS code lookup index and chapter reference.
 
     Connects to the Atlas DB, generates S-BERT embeddings, and saves
-    parquet files to data/intermediate/. Skips if files already exist
-    unless force=True.
+    parquet files to the configured intermediate data directory. Skips
+    if files already exist unless force=True.
 
     Must be run once before init_classifier().
     """
-    save_hs_chapters(output_path=CHAPTERS_PATH, force=force)
+    config = _runtime_config()
+    index_path, chapters_path = _intermediate_paths(intermediate_data_dir)
+    save_hs_chapters(output_path=chapters_path, force=force)
     build_index(
-        output_path=INDEX_PATH,
+        output_path=index_path,
         level=4,
-        model_name=EMBEDDING_MODEL,
+        model_name=config["embedding_model"],
         force=force,
     )
     logger.info("Index initialization complete")
 
 
-def init_classifier() -> dict:
+def init_classifier(
+    intermediate_data_dir: str | Path | None = None,
+) -> dict:
     """Load all heavy resources once. Pass the result to classify_row()."""
+    config = _runtime_config()
+    index_path, chapters_path = _intermediate_paths(intermediate_data_dir)
     logger.info("Loading HS chapters and FAISS index...")
-    hs_chapters = load_hs_chapters(CHAPTERS_PATH)
-    index_data, index_codes, faiss_index = load_index(INDEX_PATH)
-    embed_model = SentenceTransformer(EMBEDDING_MODEL, local_files_only=True)
+    hs_chapters = load_hs_chapters(chapters_path)
+    index_data, index_codes, faiss_index = load_index(index_path)
+    embed_model = SentenceTransformer(config["embedding_model"], local_files_only=True)
     logger.info("Classifier ready")
 
     return {
@@ -133,12 +162,13 @@ def classify_row(
         ClassificationResult with top N codes, descriptions, reasoning,
         search terms, and detected language.
     """
+    config = _runtime_config()
     # resolve defaults from .env
-    _search_term_model = search_term_model or SEARCH_TERM_MODEL
-    _reranker_model = reranker_model or RERANKER_MODEL
-    _temperature = temperature if temperature is not None else LLM_TEMPERATURE
-    _top_k_total = top_k_total if top_k_total is not None else TOP_K_TOTAL
-    _top_k_bert = top_k_bert if top_k_bert is not None else TOP_K_BERT
+    _search_term_model = search_term_model or config["search_term_model"]
+    _reranker_model = reranker_model or config["reranker_model"]
+    _temperature = temperature if temperature is not None else config["llm_temperature"]
+    _top_k_total = top_k_total if top_k_total is not None else config["top_k_total"]
+    _top_k_bert = top_k_bert if top_k_bert is not None else config["top_k_bert"]
 
     # extract product description and context fields from the row
     query_input = build_query(row)

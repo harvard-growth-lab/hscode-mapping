@@ -28,6 +28,7 @@ from hs_classifier.splitter import prepare_eval_sample
 logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
+INTERMEDIATE_DATA_DIR = Path(os.environ.get("INTERMEDIATE_DATA_DIR", "data/intermediate"))
 
 
 def split(
@@ -42,8 +43,8 @@ def split(
     Only the text column is used for clustering. All other columns
     (ground truth, metadata, etc.) are carried through to the output.
 
-    The sample is saved next to the input file by default:
-      data/raw/my_data.csv → data/raw/my_data_sample_2pct.csv
+    The sample is saved under INTERMEDIATE_DATA_DIR by default:
+      data/raw/my_data.csv → data/intermediate/samples/my_data_sample_2pct.csv
 
     Args:
         csv_path: Path to the input CSV.
@@ -70,10 +71,11 @@ def split(
 
     if output_path is None:
         frac_str = f"{sample_frac:.0%}".replace("%", "pct")
-        output_path = csv_path.with_stem(f"{csv_path.stem}_sample_{frac_str}")
+        output_path = INTERMEDIATE_DATA_DIR / "samples" / f"{csv_path.stem}_sample_{frac_str}.csv"
     else:
         output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     sample.write_csv(output_path)
 
