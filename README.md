@@ -216,7 +216,7 @@ flowchart TD
         IDX --> R
         R --> AGG["aggregate +\ndeduplicate\n~25 candidates"]
         AGG --> RR["reranker.py"]
-        RR --> OUT["top 2 HS codes\n+ reasoning"]
+        RR --> OUT["top N HS codes\n+ reasoning"]
     end
 ```
 
@@ -230,7 +230,22 @@ The LLM receives the product string, shipping context (if available), and the 97
 The original query and each generated term are independently embedded with S-BERT and searched against a FAISS index of HS code descriptions. Results are pooled and deduplicated, yielding ~25 candidate codes.
 
 **Stage 3 — Reranking** (`hs_classifier/reranker.py`)
-The LLM receives the candidate shortlist and selects the top 2 HS codes with a short justification. Context is included in the prompt when available.
+The LLM receives the candidate shortlist and selects the top N HS codes (configurable via `top_n`, default 2) with a short justification. Context is included in the prompt when available.
+
+### How the splitter works
+
+The eval splitter (`hs_classifier/splitter.py`) produces a representative sample for labeling and evaluation. The approach follows Dell (2025), who argues that embedding-based stratified sampling avoids two common pitfalls: keyword-based sampling, which fails to place positive probability on all instances and creates prediction bias; and active learning, which undersamples rare classes or produces unrepresentative samples under severe class imbalance.
+
+The pipeline:
+
+1. **Embed** — encode every product description with the same S-BERT model used for classification, producing a vector per row.
+2. **Reduce** — project embeddings to lower dimensions with UMAP (default 10 components). This preserves local structure while making clustering tractable.
+3. **Cluster** — HDBSCAN discovers natural groupings in the reduced space. Rows that don't fit any cluster are assigned to cluster -1 (noise).
+4. **Stratified sample** — draw a fixed fraction (e.g. 2%) from each cluster proportionally, so every semantic region of the data is represented in the sample.
+
+The result is a sample that covers the full diversity of your data, including rare product types that keyword filters or random sampling would miss.
+
+> Dell, Melissa. 2025. "Deep Learning for Economists." *Journal of Economic Literature* 63 (1): 5–58.
 
 ## Project structure
 
@@ -249,7 +264,7 @@ hs_classifier/
 ├── retrieval.py          # Load index parquet, FAISS search, aggregate and deduplicate
 ├── reranker.py           # LLM reranking of candidates (Instructor + Pydantic)
 ├── splitter.py           # S-BERT + UMAP + HDBSCAN clustering, stratified sampling
-└── evaluator.py          # Classification metrics and markdown report generation
+└── evaluator.py          # Classification metrics (top-1, top-k, chapter, confusion matrix)
 
 data/
 ├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
