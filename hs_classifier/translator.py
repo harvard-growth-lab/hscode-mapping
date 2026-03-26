@@ -1,10 +1,14 @@
 """Language detection and translation helpers for one product string at a time."""
 
+import logging
 import re
+import time
 from collections.abc import Callable
 
 import translators as ts
 from lingua import Language, LanguageDetectorBuilder
+
+logger = logging.getLogger(__name__)
 
 TranslatorFn = Callable[[str, str], str]
 SUPPORTED_LANGUAGES = (
@@ -15,6 +19,8 @@ SUPPORTED_LANGUAGES = (
     Language.GERMAN,
 )
 DETECTOR = LanguageDetectorBuilder.from_languages(*SUPPORTED_LANGUAGES).build()
+TRANSLATION_MAX_RETRIES = 3
+TRANSLATION_BACKOFF_SECONDS = 1.0
 
 
 def _normalize_text(text: str | None) -> str:
@@ -45,6 +51,42 @@ def _google_translate(text: str, from_lang: str) -> str:
     )
 
 
+def _translate_with_retry(
+    text: str,
+    from_lang: str,
+    translator: TranslatorFn,
+    max_retries: int = TRANSLATION_MAX_RETRIES,
+    backoff_seconds: float = TRANSLATION_BACKOFF_SECONDS,
+) -> str:
+    last_error: Exception | None = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            return translator(text, from_lang)
+        except Exception as exc:
+            last_error = exc
+            if attempt == max_retries:
+                break
+
+            sleep_seconds = backoff_seconds * attempt
+            logger.warning(
+                "Translation failed for language '%s' on attempt %s/%s; retrying in %.1fs",
+                from_lang,
+                attempt,
+                max_retries,
+                sleep_seconds,
+            )
+            time.sleep(sleep_seconds)
+
+    logger.warning(
+        "Translation failed for language '%s' after %s attempts; using original text. Error: %s",
+        from_lang,
+        max_retries,
+        last_error,
+    )
+    return text
+
+
 def translate_eng(
     text: str,
     from_lang: str | None = None,
@@ -58,7 +100,7 @@ def translate_eng(
         return normalized
 
     backend = translator or _google_translate
-    translated = _normalize_text(backend(normalized, source_lang))
+    translated = _normalize_text(_translate_with_retry(normalized, source_lang, backend))
     return translated or normalized
 
 

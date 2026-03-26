@@ -25,8 +25,8 @@
 
 The `translators` package leaks HTTP connections. It creates `requests.Session` objects but never calls `.close()` on them. Sessions auto-rotate every 1000 queries or 25 minutes, abandoning the old session without cleanup. This causes `ConnectionError: Connection max age expired` when the remote server times out a stale connection.
 
-`hs_classifier/translator.py` calls `ts.translate_text()` with no retry or session management on its side.
+`hs_classifier/translator.py` now retries translation calls with simple backoff and falls back to the original text if all attempts fail, but it still relies on upstream session behavior in `translators`.
 
 **Workaround:** Re-run the failing cell — the stale session gets replaced on the next call.
 
-**Proper fix:** Add retry logic around translation calls in `hs_classifier`, and/or file an issue upstream on the `translators` package for the missing `.close()` calls.
+**Proper fix:** File an issue upstream on the `translators` package for the missing `.close()` calls, or replace it with a backend that exposes explicit session management.
