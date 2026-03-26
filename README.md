@@ -73,6 +73,27 @@ sample = prepare_eval_sample(
 sample.write_csv("data/intermediate/samples/my_data_sample_2pct.csv")
 ```
 
+If you prefer pandas, convert to Polars only for the splitter call:
+
+```python
+import os
+import pandas as pd
+import polars as pl
+from sentence_transformers import SentenceTransformer
+from hs_classifier.splitter import prepare_eval_sample
+
+df = pd.read_csv("data/raw/my_data.csv")
+model = SentenceTransformer(os.environ["EMBEDDING_MODEL"], local_files_only=True)
+
+sample = prepare_eval_sample(
+    pl.from_pandas(df),
+    text_col="product_description",
+    model=model,
+    sample_frac=0.02,
+)
+sample.write_csv("data/intermediate/samples/my_data_sample_2pct.csv")
+```
+
 ### 4. Label the sample
 
 Open the sample CSV and add a ground truth `hs_code` column — either from existing labels in your data, or by manually reviewing and annotating each row.
@@ -92,13 +113,51 @@ for row in labeled.iter_rows(named=True):
     results.append({
         "code_true": row["hs_code"],
         **{f"code_{i+1}": c for i, c in enumerate(result.codes)},
+        "reason": result.reason,
     })
 
 results_df = pl.DataFrame(results)
+print(results_df.select("code_true", "code_1", "code_2", "reason"))
 report = evaluation_report(results_df, truth_col="code_true")
 print(report["summary_text"])
 print(report["top1_count"], report["topk_count"], report["chapter_count"])
 print(report["correctness_summary"])  # correct/incorrect summary for top-1, top-k, and chapter
+```
+
+`evaluation_report()` returns:
+- `summary_text`: plain-English summary of how often the classifier matched
+- `top1_count`, `topk_count`, `chapter_count`: count strings like `15/18`
+- `top1_accuracy`, `topk_accuracy`, `chapter_accuracy`: accuracy rates as floats
+- `correctness_summary`: a small table of correct vs incorrect counts for top-1, top-k, and chapter
+
+A "miss table" just means a table showing only the rows the model got wrong, usually with the product description, the true code, and the predicted code. The evaluator does not return one yet.
+
+Pandas version:
+
+```python
+import pandas as pd
+import polars as pl
+from hs_classifier.evaluator import evaluation_report
+
+labeled = pd.read_csv(
+    "data/intermediate/samples/my_data_sample_2pct_labeled.csv",
+    dtype={"hs_code": str},
+)
+
+results = []
+for row in labeled.to_dict(orient="records"):
+    result = classify_row(row, classifier)
+    results.append({
+        "code_true": row["hs_code"],
+        **{f"code_{i+1}": c for i, c in enumerate(result.codes)},
+        "reason": result.reason,
+    })
+
+results_df = pd.DataFrame(results)
+print(results_df[["code_true", "code_1", "code_2", "reason"]])
+report = evaluation_report(pl.from_pandas(results_df), truth_col="code_true")
+print(report["summary_text"])
+print(report["correctness_summary"])
 ```
 
 ### 6. Tune and compare
@@ -140,6 +199,26 @@ for row in df.iter_rows(named=True):
 
 classified = pl.DataFrame(all_results)
 classified.write_csv("data/raw/my_data_classified.csv")
+```
+
+Pandas version:
+
+```python
+import pandas as pd
+
+df = pd.read_csv("data/raw/my_data.csv")
+
+all_results = []
+for row in df.to_dict(orient="records"):
+    result = classify_row(row, classifier, **best_config)
+    all_results.append({
+        **row,
+        **{f"hs_{i+1}": c for i, c in enumerate(result.codes)},
+        "reason": result.reason,
+    })
+
+classified = pd.DataFrame(all_results)
+classified.to_csv("data/raw/my_data_classified.csv", index=False)
 ```
 
 See [`example.ipynb`](example.ipynb) for a runnable version of this full workflow.
@@ -280,10 +359,9 @@ data/
 
 ## Future improvements
 
-1. **Pandas documentation:** README examples currently use Polars throughout. Most users in economics and trade research will expect pandas. Provide pandas equivalents (or both side-by-side) to lower the barrier to entry — especially for `read_csv` with dtype handling and the evaluation loop.
-2. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
-3. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
-4. **Code tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
+1. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
+2. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
+3. **Code tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
 
 **Nice to have:**
 - **Batch classification:** `classify_row()` processes one row at a time. A `classify_batch()` that batches LLM calls would be faster for bulk runs.

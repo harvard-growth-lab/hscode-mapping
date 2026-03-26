@@ -15,11 +15,6 @@
 - `generate_search_terms()` is assumed to return at least one term. The retrieval code now guards against an empty list, but an empty term set still reduces recall because only the raw query search runs.
 - `_build_db_uri()` in `hs_classifier/init_lookup_index.py` interpolates credentials directly into the PostgreSQL URI. If the username or password contains reserved URL characters like `@`, `:`, or `/`, the DB connection can fail. Proper fix: URL-encode credentials before building the URI.
 
-## Documentation
-
-- README evaluation example only captures `codes` from `ClassificationResult` but drops `reason`, `descriptions`, `search_terms`, and `detected_language`. The example should show how to include at least `reason` in `results_df` so users know the reasoning is available.
-- README examples use Polars, but most users will expect pandas. Should provide pandas examples (or both).
-
 ## Connection Errors
 
 The `translators` package leaks HTTP connections. It creates `requests.Session` objects but never calls `.close()` on them. Sessions auto-rotate every 1000 queries or 25 minutes, abandoning the old session without cleanup. This causes `ConnectionError: Connection max age expired` when the remote server times out a stale connection.
