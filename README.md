@@ -9,14 +9,20 @@ Requires Python 3.12+. Install into a virtual environment:
 ```bash
 # uv (recommended)
 uv venv && source .venv/bin/activate
-uv add git+https://github.com/karandaryanani/panjiva-hscode.git
+uv add "hs-classifier[anthropic] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
 
 # or pip
 python -m venv .venv && source .venv/bin/activate
-pip install git+https://github.com/karandaryanani/panjiva-hscode.git
+pip install "hs-classifier[anthropic] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
 ```
 
-This installs `hs-classifier` and all its dependencies (faiss-cpu, instructor, polars, sentence-transformers, etc.).
+Pick the extra for your LLM provider:
+
+| Extra | Install | Providers |
+|---|---|---|
+| `[anthropic]` | `pip install "hs-classifier[anthropic] @ ..."` | Claude models |
+| `[google]` | `pip install "hs-classifier[google] @ ..."` | Gemini models |
+| `[all]` | `pip install "hs-classifier[all] @ ..."` | All providers |
 
 ## Quick start
 
@@ -163,7 +169,7 @@ data/
 
 ## Future improvements
 
-1. **Provider extras:** `anthropic` and `google-genai` are both hard dependencies today. Restructuring as optional extras (`pip install hs-classifier[anthropic]`) would keep installs lighter.
+1. ~~**Provider extras:**~~ Done — install with `[anthropic]`, `[google]`, or `[all]`.
 2. **Evaluation pipeline:** Train/test split on labeled data to measure classification accuracy (top-1, top-k hit rate) and guide tuning of retrieval parameters, prompts, and model choices.
 3. **Configurable top-N results:** The reranker currently returns exactly 2 codes. Making this configurable (e.g. top 5) gives downstream consumers more options for filtering or ensembling.
 4. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.

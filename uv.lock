@@ -873,11 +873,9 @@ name = "hs-classifier"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "anthropic" },
     { name = "connectorx" },
     { name = "faiss-cpu" },
     { name = "fire" },
-    { name = "google-genai" },
     { name = "instructor" },
     { name = "jsonref" },
     { name = "lingua-language-detector" },
@@ -888,6 +886,18 @@ dependencies = [
     { name = "translators" },
 ]
 
+[package.optional-dependencies]
+all = [
+    { name = "anthropic" },
+    { name = "google-genai" },
+]
+anthropic = [
+    { name = "anthropic" },
+]
+google = [
+    { name = "google-genai" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "ipykernel" },
@@ -896,11 +906,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.86.0" },
+    { name = "anthropic", marker = "extra == 'all'", specifier = ">=0.86.0" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.86.0" },
     { name = "connectorx", specifier = ">=0.4.5" },
     { name = "faiss-cpu", specifier = ">=1.11.0" },
     { name = "fire", specifier = ">=0.7.1" },
-    { name = "google-genai", specifier = ">=1.68.0" },
+    { name = "google-genai", marker = "extra == 'all'", specifier = ">=1.68.0" },
+    { name = "google-genai", marker = "extra == 'google'", specifier = ">=1.68.0" },
     { name = "instructor", specifier = ">=1.14.5" },
     { name = "jsonref", specifier = ">=1.1.0" },
     { name = "lingua-language-detector", specifier = ">=1.4.2" },
@@ -910,6 +922,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=5.0.0" },
     { name = "translators", specifier = ">=5.9.9" },
 ]
+provides-extras = ["google", "anthropic", "all"]
 
 [package.metadata.requires-dev]
 dev = [
