@@ -96,7 +96,8 @@ for row in labeled.iter_rows(named=True):
 
 results_df = pl.DataFrame(results)
 report = evaluation_report(results_df, truth_col="code_true")
-print(report)  # top-1, top-k, chapter accuracy + confusion matrix
+print(report["top1_count"], report["topk_count"], report["chapter_count"])
+print(report["confusion_matrix"])  # correct/incorrect summary for top-1, top-k, and chapter
 ```
 
 ### 6. Tune and compare
@@ -269,7 +270,7 @@ hs_classifier/
 ├── retrieval.py          # Load index parquet, FAISS search, aggregate and deduplicate
 ├── reranker.py           # LLM reranking of candidates (Instructor + Pydantic)
 ├── splitter.py           # S-BERT + UMAP + HDBSCAN clustering, stratified sampling
-└── evaluator.py          # Classification metrics (top-1, top-k, chapter, confusion matrix)
+└── evaluator.py          # Classification metrics with readable counts + simple confusion matrix
 
 data/
 ├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
@@ -278,12 +279,11 @@ data/
 
 ## Future improvements
 
-1. **User-friendly evaluation output:** `evaluation_report()` currently returns raw accuracy floats and a sparse multi-class cross-tabulation as the "confusion matrix." With small eval samples (e.g. 18 rows across 15+ HS chapters), this matrix is mostly zeros and hard to interpret. Replace with: (a) plain counts like "8/18 top-1, 10/18 top-2, 10/18 chapter," (b) a miss table showing only incorrect rows with product description, predicted code, and truth code, and (c) a simple 2×2 correct/incorrect summary per level (top-1, top-k, chapter).
-2. **Translation retry logic:** The `translators` package (Google backend) leaks HTTP connections — sessions are never explicitly closed, and stale connections cause `ConnectionError: Connection max age expired` mid-classification loop. `hs_classifier/translator.py` calls `ts.translate_text()` with no retry or error handling. Adding a retry wrapper (e.g. `tenacity` or a simple try/except with backoff) would prevent crashes during bulk runs.
-3. **Pandas documentation:** README examples currently use Polars throughout. Most users in economics and trade research will expect pandas. Provide pandas equivalents (or both side-by-side) to lower the barrier to entry — especially for `read_csv` with dtype handling and the evaluation loop.
-4. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
-5. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
-6. **Code tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
+1. **Translation retry logic:** The `translators` package (Google backend) leaks HTTP connections — sessions are never explicitly closed, and stale connections cause `ConnectionError: Connection max age expired` mid-classification loop. `hs_classifier/translator.py` calls `ts.translate_text()` with no retry or error handling. Adding a retry wrapper (e.g. `tenacity` or a simple try/except with backoff) would prevent crashes during bulk runs.
+2. **Pandas documentation:** README examples currently use Polars throughout. Most users in economics and trade research will expect pandas. Provide pandas equivalents (or both side-by-side) to lower the barrier to entry — especially for `read_csv` with dtype handling and the evaluation loop.
+3. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
+4. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
+5. **Code tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
 
 **Nice to have:**
 - **Batch classification:** `classify_row()` processes one row at a time. A `classify_batch()` that batches LLM calls would be faster for bulk runs.
