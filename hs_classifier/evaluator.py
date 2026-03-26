@@ -1,14 +1,26 @@
 """Evaluate pipeline predictions against ground truth HS codes."""
 
+from typing import Any
+
+import pandas as pd
 import polars as pl
 
 
+def _to_polars(df: Any) -> tuple[pl.DataFrame, bool]:
+    if isinstance(df, pl.DataFrame):
+        return df, False
+    if isinstance(df, pd.DataFrame):
+        return pl.from_pandas(df), True
+    raise TypeError("Expected a pandas or polars DataFrame")
+
+
 def evaluation_report(
-    df: pl.DataFrame,
+    df: Any,
     truth_col: str = "code_true",
     pred_cols: list[str] | None = None,
 ) -> dict:
     """Compute top-1, top-k, and chapter accuracy. Returns a readable summary dict."""
+    df, return_pandas = _to_polars(df)
     pred_cols = pred_cols or ["code_1", "code_2"]
     pred_col = pred_cols[0]
     n = len(df)
@@ -52,5 +64,7 @@ def evaluation_report(
         "top1_accuracy": top1,
         "topk_accuracy": topk,
         "chapter_accuracy": chapter,
-        "correctness_summary": correctness_summary,
+        "correctness_summary": (
+            correctness_summary.to_pandas() if return_pandas else correctness_summary
+        ),
     }

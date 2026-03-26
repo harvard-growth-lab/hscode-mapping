@@ -60,25 +60,7 @@ Before classifying your full dataset, take a small representative sample using s
 
 ```python
 import os
-import polars as pl
-from sentence_transformers import SentenceTransformer
-from hs_classifier.splitter import prepare_eval_sample
-
-df = pl.read_csv("data/raw/my_data.csv")
-model = SentenceTransformer(os.environ["EMBEDDING_MODEL"], local_files_only=True)
-
-sample = prepare_eval_sample(
-    df, text_col="product_description", model=model, sample_frac=0.02,
-)
-sample.write_csv("data/intermediate/samples/my_data_sample_2pct.csv")
-```
-
-If you prefer pandas, convert to Polars only for the splitter call:
-
-```python
-import os
 import pandas as pd
-import polars as pl
 from sentence_transformers import SentenceTransformer
 from hs_classifier.splitter import prepare_eval_sample
 
@@ -86,12 +68,9 @@ df = pd.read_csv("data/raw/my_data.csv")
 model = SentenceTransformer(os.environ["EMBEDDING_MODEL"], local_files_only=True)
 
 sample = prepare_eval_sample(
-    pl.from_pandas(df),
-    text_col="product_description",
-    model=model,
-    sample_frac=0.02,
+    df, text_col="product_description", model=model, sample_frac=0.02,
 )
-sample.write_csv("data/intermediate/samples/my_data_sample_2pct.csv")
+sample.to_csv("data/intermediate/samples/my_data_sample_2pct.csv", index=False)
 ```
 
 ### 4. Label the sample
@@ -103,40 +82,7 @@ Open the sample CSV and add a ground truth `hs_code` column — either from exis
 Run the classifier on each labeled row, collect predictions alongside ground truth, and compute metrics.
 
 ```python
-from hs_classifier.evaluator import evaluation_report
-
-labeled = pl.read_csv("data/intermediate/samples/my_data_sample_2pct_labeled.csv")
-
-results = []
-for row in labeled.iter_rows(named=True):
-    result = classify_row(row, classifier)
-    results.append({
-        "code_true": row["hs_code"],
-        **{f"code_{i+1}": c for i, c in enumerate(result.codes)},
-        "reason": result.reason,
-    })
-
-results_df = pl.DataFrame(results)
-print(results_df.select("code_true", "code_1", "code_2", "reason"))
-report = evaluation_report(results_df, truth_col="code_true")
-print(report["summary_text"])
-print(report["top1_count"], report["topk_count"], report["chapter_count"])
-print(report["correctness_summary"])  # correct/incorrect summary for top-1, top-k, and chapter
-```
-
-`evaluation_report()` returns:
-- `summary_text`: plain-English summary of how often the classifier matched
-- `top1_count`, `topk_count`, `chapter_count`: count strings like `15/18`
-- `top1_accuracy`, `topk_accuracy`, `chapter_accuracy`: accuracy rates as floats
-- `correctness_summary`: a small table of correct vs incorrect counts for top-1, top-k, and chapter
-
-A "miss table" just means a table showing only the rows the model got wrong, usually with the product description, the true code, and the predicted code. The evaluator does not return one yet.
-
-Pandas version:
-
-```python
 import pandas as pd
-import polars as pl
 from hs_classifier.evaluator import evaluation_report
 
 labeled = pd.read_csv(
@@ -155,29 +101,40 @@ for row in labeled.to_dict(orient="records"):
 
 results_df = pd.DataFrame(results)
 print(results_df[["code_true", "code_1", "code_2", "reason"]])
-report = evaluation_report(pl.from_pandas(results_df), truth_col="code_true")
+report = evaluation_report(results_df, truth_col="code_true")
 print(report["summary_text"])
-print(report["correctness_summary"])
+print(report["top1_count"], report["topk_count"], report["chapter_count"])
+print(report["correctness_summary"])  # correct/incorrect summary for top-1, top-k, and chapter
 ```
+
+`evaluation_report()` returns:
+- `summary_text`: plain-English summary of how often the classifier matched
+- `top1_count`, `topk_count`, `chapter_count`: count strings like `15/18`
+- `top1_accuracy`, `topk_accuracy`, `chapter_accuracy`: accuracy rates as floats
+- `correctness_summary`: a small table of correct vs incorrect counts for top-1, top-k, and chapter
+
+A "miss table" just means a table showing only the rows the model got wrong, usually with the product description, the true code, and the predicted code. The evaluator does not return one yet.
 
 ### 6. Tune and compare
 
 Not happy with the results? Override model and retrieval parameters per call to compare configurations — no need to edit `.env`.
 
 ```python
+import pandas as pd
+
 configs = [
     {"reranker_model": "anthropic/claude-haiku-4-5-20251001", "top_k_total": 25},
     {"reranker_model": "google/gemini-2.5-flash-lite", "top_k_total": 50},
 ]
 for config in configs:
     results = []
-    for row in labeled.iter_rows(named=True):
+    for row in labeled.to_dict(orient="records"):
         r = classify_row(row, classifier, **config)
         results.append({
             "code_true": row["hs_code"],
             **{f"code_{i+1}": c for i, c in enumerate(r.codes)},
         })
-    report = evaluation_report(pl.DataFrame(results), truth_col="code_true")
+    report = evaluation_report(pd.DataFrame(results), truth_col="code_true")
     # ... compare reports
 ```
 
@@ -186,7 +143,9 @@ for config in configs:
 Once you've picked the best configuration, run it on your full dataset.
 
 ```python
-df = pl.read_csv("data/raw/my_data.csv")
+import pandas as pd
+
+df = pd.read_csv("data/raw/my_data.csv")
 
 all_results = []
 for row in df.iter_rows(named=True):
@@ -197,15 +156,13 @@ for row in df.iter_rows(named=True):
         "reason": result.reason,
     })
 
-classified = pl.DataFrame(all_results)
-classified.write_csv("data/raw/my_data_classified.csv")
+classified = pd.DataFrame(all_results)
+classified.to_csv("data/raw/my_data_classified.csv", index=False)
 ```
 
 Pandas version:
 
 ```python
-import pandas as pd
-
 df = pd.read_csv("data/raw/my_data.csv")
 
 all_results = []

@@ -30,15 +30,17 @@ Usage:
     )
 
 Input requirements:
-    - A polars DataFrame with at least a text column (product descriptions).
+    - A pandas or polars DataFrame with at least a text column (product descriptions).
     - The text column is used for semantic embedding → UMAP → HDBSCAN.
     - Rows with null text are dropped before clustering.
     - All other columns are preserved as-is in the output.
 """
 
 import logging
+from typing import Any
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from hdbscan import HDBSCAN
 from sentence_transformers import SentenceTransformer
@@ -47,15 +49,29 @@ from umap import UMAP
 logger = logging.getLogger(__name__)
 
 
+def _to_polars(df: Any) -> tuple[pl.DataFrame, bool]:
+    if isinstance(df, pl.DataFrame):
+        return df, False
+    if isinstance(df, pd.DataFrame):
+        return pl.from_pandas(df), True
+    raise TypeError("Expected a pandas or polars DataFrame")
+
+
+def _from_polars(df: pl.DataFrame, return_pandas: bool) -> Any:
+    if return_pandas:
+        return df.to_pandas()
+    return df
+
+
 def assign_clusters(
-    df: pl.DataFrame,
+    df: Any,
     text_col: str,
     model: SentenceTransformer,
     min_cluster_size: int = 10,
     umap_n_neighbors: int = 15,
     umap_n_components: int = 10,
     random_state: int = 42,
-) -> pl.DataFrame:
+) -> Any:
     """Embed descriptions, reduce with UMAP, cluster with HDBSCAN.
 
     Adds a ``cluster`` column (int) to the DataFrame.
@@ -73,6 +89,8 @@ def assign_clusters(
     Returns:
         DataFrame with a new ``cluster`` column.
     """
+    df, return_pandas = _to_polars(df)
+
     if text_col not in df.columns:
         raise ValueError(f"Column '{text_col}' not found. Available: {df.columns}")
 
@@ -111,15 +129,15 @@ def assign_clusters(
     n_noise = int((labels == -1).sum())
     logger.info(f"HDBSCAN: {n_clusters} clusters, {n_noise} noise points")
 
-    return df.with_columns(pl.Series("cluster", labels))
+    return _from_polars(df.with_columns(pl.Series("cluster", labels)), return_pandas)
 
 
 def stratified_sample(
-    df: pl.DataFrame,
+    df: Any,
     sample_frac: float = 0.02,
     cluster_col: str = "cluster",
     random_state: int = 42,
-) -> pl.DataFrame:
+) -> Any:
     """Draw a stratified sample proportional to each cluster.
 
     Takes at least 1 row per cluster (including noise) so all semantic
@@ -134,6 +152,7 @@ def stratified_sample(
     Returns:
         Sampled DataFrame (cluster column preserved for inspection).
     """
+    df, return_pandas = _to_polars(df)
     rng = np.random.default_rng(random_state)
     parts = []
 
@@ -150,11 +169,11 @@ def stratified_sample(
         f"Stratified sample: {len(sample)} rows from {len(df)} "
         f"({len(sample)/len(df):.1%})"
     )
-    return sample
+    return _from_polars(sample, return_pandas)
 
 
 def prepare_eval_sample(
-    df: pl.DataFrame,
+    df: Any,
     text_col: str,
     model: SentenceTransformer,
     sample_frac: float = 0.02,
@@ -162,7 +181,7 @@ def prepare_eval_sample(
     umap_n_neighbors: int = 15,
     umap_n_components: int = 10,
     random_state: int = 42,
-) -> pl.DataFrame:
+) -> Any:
     """End-to-end: validate → cluster → stratified sample.
 
     Only needs the text column for clustering. All other columns
@@ -181,9 +200,6 @@ def prepare_eval_sample(
     Returns:
         Sampled DataFrame with all original columns + ``cluster`` column.
     """
-    if text_col not in df.columns:
-        raise ValueError(f"Column '{text_col}' not found. Available: {df.columns}")
-
     # cluster
     df = assign_clusters(
         df,
