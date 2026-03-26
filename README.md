@@ -7,22 +7,24 @@ Takes a product description string and returns the best-matching Harmonized Syst
 Requires Python 3.12+. Install into a virtual environment:
 
 ```bash
-# uv (recommended)
-uv venv && source .venv/bin/activate
-uv add "hs-classifier[anthropic] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
+# 1. Create a virtual environment
+uv venv && source .venv/bin/activate   # or: python -m venv .venv && source .venv/bin/activate
 
-# or pip
-python -m venv .venv && source .venv/bin/activate
+# 2. Install with your LLM provider
 pip install "hs-classifier[anthropic] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
 ```
 
-Pick the extra for your LLM provider:
+Pick the extra that matches your provider:
 
-| Extra | Install | Providers |
-|---|---|---|
-| `[anthropic]` | `pip install "hs-classifier[anthropic] @ ..."` | Claude models |
-| `[google]` | `pip install "hs-classifier[google] @ ..."` | Gemini models |
-| `[all]` | `pip install "hs-classifier[all] @ ..."` | All providers |
+| Extra | Provider | API key to set | Example model |
+|---|---|---|---|
+| `[anthropic]` | Anthropic | `ANTHROPIC_API_KEY` | `anthropic/claude-haiku-4-5-20251001` |
+| `[google]` | Google Gemini | `GOOGLE_API_KEY` | `google/gemini-2.5-flash-lite` |
+| `[openai]` | OpenAI | `OPENAI_API_KEY` | `openai/gpt-4o-mini` |
+| `[cohere]` | Cohere | `COHERE_API_KEY` | `cohere/command-r-plus` |
+| `[all]` | All of the above | — | — |
+
+Then configure `.env` with the matching API key and model strings (see `.env.example`).
 
 ## Quick start
 
@@ -76,15 +78,7 @@ All configuration lives in `.env` (see `.env.example` for annotated defaults).
 
 ### LLM providers
 
-Only the API key for your chosen provider is required. Install the corresponding package if not already present.
-
-| Provider | API key variable | Example model string | Package |
-|---|---|---|---|
-| Google Gemini | `GOOGLE_API_KEY` | `google/gemini-2.5-flash-lite` | `google-genai` (included) |
-| Anthropic | `ANTHROPIC_API_KEY` | `anthropic/claude-sonnet-4-20250514` | `anthropic` (included) |
-| Cohere | `COHERE_API_KEY` | `cohere/command-r-plus` | `pip install cohere` |
-
-LLM models use `instructor.from_provider()` — see [Instructor docs](https://python.useinstructor.com/) for the full list of supported providers.
+Install the extra for your provider (see [Installation](#installation)) and set the corresponding API key in `.env`. Models use `instructor.from_provider()` — see [Instructor docs](https://python.useinstructor.com/) for the full list of supported providers.
 
 ### Models
 
