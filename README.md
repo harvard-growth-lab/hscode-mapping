@@ -96,8 +96,9 @@ for row in labeled.iter_rows(named=True):
 
 results_df = pl.DataFrame(results)
 report = evaluation_report(results_df, truth_col="code_true")
+print(report["summary_text"])
 print(report["top1_count"], report["topk_count"], report["chapter_count"])
-print(report["confusion_matrix"])  # correct/incorrect summary for top-1, top-k, and chapter
+print(report["correctness_summary"])  # correct/incorrect summary for top-1, top-k, and chapter
 ```
 
 ### 6. Tune and compare
@@ -270,7 +271,7 @@ hs_classifier/
 ├── retrieval.py          # Load index parquet, FAISS search, aggregate and deduplicate
 ├── reranker.py           # LLM reranking of candidates (Instructor + Pydantic)
 ├── splitter.py           # S-BERT + UMAP + HDBSCAN clustering, stratified sampling
-└── evaluator.py          # Classification metrics with readable counts + simple confusion matrix
+└── evaluator.py          # Classification metrics with readable counts + plain-English summary
 
 data/
 ├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
