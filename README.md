@@ -227,12 +227,14 @@ The LLM receives the candidate shortlist and selects the top N HS codes (configu
 
 The eval splitter (`hs_classifier/splitter.py`) produces a representative sample for labeling and evaluation. The approach follows Dell (2025), who argues that embedding-based stratified sampling avoids two common pitfalls: keyword-based sampling, which fails to place positive probability on all instances and creates prediction bias; and active learning, which undersamples rare classes or produces unrepresentative samples under severe class imbalance.
 
-The pipeline:
-
-1. **Embed** — encode every product description with the same S-BERT model used for classification, producing a vector per row.
-2. **Reduce** — project embeddings to lower dimensions with UMAP (default 10 components). This preserves local structure while making clustering tractable.
-3. **Cluster** — HDBSCAN discovers natural groupings in the reduced space. Rows that don't fit any cluster are assigned to cluster -1 (noise).
-4. **Stratified sample** — draw a fixed fraction (e.g. 2%) from each cluster proportionally, so every semantic region of the data is represented in the sample.
+```mermaid
+flowchart LR
+    A["Product descriptions"] --> B["S-BERT\nencode each row"]
+    B --> C["UMAP\nreduce to 10 dims"]
+    C --> D["HDBSCAN\ndiscover clusters\n(noise → cluster -1)"]
+    D --> E["Stratified sample\ndraw N% per cluster"]
+    E --> F["Representative\neval sample"]
+```
 
 The result is a sample that covers the full diversity of your data, including rare product types that keyword filters or random sampling would miss.
 
