@@ -28,36 +28,38 @@ Then configure `.env` with the matching API key and model strings (see `.env.exa
 
 ## Quick start
 
+### 1. Install and configure
+
 ```bash
-cp .env.example .env  # fill in API keys, Atlas DB credentials, and model choices
+uv venv && source .venv/bin/activate
+pip install "hs-classifier[google] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
+cp .env.example .env   # fill in API keys, Atlas DB credentials, and model choices
 ```
 
-### 1. Setup
+### 2. Setup
+
+Build the lookup index (one-time), load the classifier, and run a quick smoke test.
 
 ```python
 from hs_classifier import init_index, init_classifier, classify_row
 
-init_index()              # one-time: build FAISS index from Atlas DB (skips if exists)
+init_index()                     # one-time: build FAISS index from Atlas DB (skips if exists)
 classifier = init_classifier()   # load heavy resources (FAISS index, S-BERT model)
-```
 
-### 2. Classify
-
-```python
-row = {"product_description": "frozen shrimp", "container_description": "20ft reefer"}
-result = classify_row(row, classifier)
-
-result.code_first    # "0306"
-result.desc_first    # "Crustaceans; ..."
-result.code_second   # "1605"
-result.reason        # LLM justification
+# smoke test — classify a single row
+result = classify_row(
+    {"product_description": "frozen shrimp", "container_description": "20ft reefer"},
+    classifier,
+)
+print(result.code_first, result.desc_first)
 ```
 
 ### 3. Create an eval sample
 
-Take a representative slice of your dataset using semantic clustering (S-BERT → UMAP → HDBSCAN → stratified sample). Only the text column is used for clustering — everything else passes through.
+Before classifying your full dataset, take a small representative sample using semantic clustering (S-BERT → UMAP → HDBSCAN → stratified sample). Only the text column is used for clustering — everything else passes through.
 
 ```python
+import os
 import polars as pl
 from sentence_transformers import SentenceTransformer
 from hs_classifier.splitter import prepare_eval_sample
@@ -65,13 +67,15 @@ from hs_classifier.splitter import prepare_eval_sample
 df = pl.read_csv("data/raw/my_data.csv")
 model = SentenceTransformer(os.environ["EMBEDDING_MODEL"], local_files_only=True)
 
-sample = prepare_eval_sample(df, text_col="product_description", model=model, sample_frac=0.02)
+sample = prepare_eval_sample(
+    df, text_col="product_description", model=model, sample_frac=0.02,
+)
 sample.write_csv("data/raw/my_data_sample_2pct.csv")
 ```
 
 ### 4. Label the sample
 
-Add a ground truth HS code column to the sample — either from existing labels in your data, or by manually reviewing and annotating.
+Open the sample CSV and add a ground truth `hs_code` column — either from existing labels in your data, or by manually reviewing and annotating each row.
 
 ### 5. Classify the sample and evaluate
 
@@ -81,10 +85,9 @@ Run the classifier on each labeled row, collect predictions alongside ground tru
 from hs_classifier.evaluator import evaluation_report, report_to_markdown
 
 labeled = pl.read_csv("data/raw/my_data_sample_2pct_labeled.csv")
-rows = labeled.iter_rows(named=True)
 
 results = []
-for row in rows:
+for row in labeled.iter_rows(named=True):
     result = classify_row(row, classifier)
     results.append({
         "code_true": row["hs_code"],
@@ -99,7 +102,7 @@ print(report_to_markdown(report))
 
 ### 6. Tune and compare
 
-Override model and retrieval parameters per call to compare configurations — no need to edit `.env`.
+Not happy with the results? Override model and retrieval parameters per call to compare configurations — no need to edit `.env`.
 
 ```python
 configs = [
@@ -107,8 +110,37 @@ configs = [
     {"reranker_model": "google/gemini-2.5-flash-lite", "top_k_total": 50},
 ]
 for config in configs:
-    results = [classify_row(row, classifier, **config) for row in rows]
-    # ... evaluate each config
+    results = []
+    for row in labeled.iter_rows(named=True):
+        r = classify_row(row, classifier, **config)
+        results.append({
+            "code_true": row["hs_code"],
+            "code_first": r.code_first,
+            "code_second": r.code_second,
+        })
+    report = evaluation_report(pl.DataFrame(results), truth_col="code_true")
+    # ... compare reports
+```
+
+### 7. Classify your full dataset
+
+Once you've picked the best configuration, run it on your full dataset.
+
+```python
+df = pl.read_csv("data/raw/my_data.csv")
+
+all_results = []
+for row in df.iter_rows(named=True):
+    result = classify_row(row, classifier, **best_config)
+    all_results.append({
+        **row,
+        "hs_first": result.code_first,
+        "hs_second": result.code_second,
+        "reason": result.reason,
+    })
+
+classified = pl.DataFrame(all_results)
+classified.write_csv("data/raw/my_data_classified.csv")
 ```
 
 See [`example.ipynb`](example.ipynb) for a runnable version of this full workflow.
