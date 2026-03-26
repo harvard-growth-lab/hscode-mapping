@@ -87,9 +87,7 @@ def build_index(
     embeddings = normalized_embeddings(data["description"].to_list(), model)
 
     # add embedding vectors as a list column
-    data = data.with_columns(
-        pl.Series("embedding", embeddings.tolist())
-    )
+    data = data.with_columns(pl.Series("embedding", embeddings.tolist()))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     data.write_parquet(output_path)

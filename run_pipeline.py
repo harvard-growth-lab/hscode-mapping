@@ -17,7 +17,7 @@ for name in ("httpx", "faiss.loader", "sentence_transformers", "instructor"):
 import fire
 import polars as pl
 
-from hs_classifier import init_classifier, classify_row
+from hs_classifier import classify_row, init_classifier
 
 
 def load_sample_row(

@@ -20,4 +20,20 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ipykernel>=6.29.5"]
+dev = [
+    "ipykernel>=6.29.5",
+    "ruff>=0.15.7",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+# E = pycodestyle errors, F = pyflakes, I = isort (import sorting), W = warnings
+
+[tool.ruff.lint.per-file-ignores]
+# imports must come after load_dotenv() / warnings setup in these files
+"hs_classifier/__init__.py" = ["E402"]
+"run_init.py" = ["E402"]
+"run_pipeline.py" = ["E402"]
