@@ -1,5 +1,12 @@
 """Semantic clustering and stratified sampling for evaluation.
 
+Embeds product descriptions with S-BERT, reduces with UMAP, clusters
+with HDBSCAN, then draws a stratified sample from each cluster.
+
+The splitter only needs the text column — it embeds and clusters based
+on product description semantics. All other columns (including any
+ground truth HS codes) are simply carried through untouched.
+
 Pipeline:
   1. Embed product descriptions with S-BERT (reuses the model already loaded)
   2. Reduce dimensions with UMAP
@@ -18,16 +25,12 @@ Usage:
     sample = prepare_eval_sample(
         df,
         text_col="product_description",
-        truth_col="hs_code",           # ground truth — must be str, not int
         model=embed_model,
         sample_frac=0.02,
     )
 
 Input requirements:
-    - A polars DataFrame with at least a text column and a ground truth column.
-    - HS codes must be strings (e.g. "0306", not 306). The ground truth column
-      is cast to pl.String automatically, but the source data should use text
-      types to preserve leading zeros.
+    - A polars DataFrame with at least a text column (product descriptions).
     - The text column is used for semantic embedding → UMAP → HDBSCAN.
     - Rows with null text are dropped before clustering.
     - All other columns are preserved as-is in the output.
@@ -153,7 +156,6 @@ def stratified_sample(
 def prepare_eval_sample(
     df: pl.DataFrame,
     text_col: str,
-    truth_col: str,
     model: SentenceTransformer,
     sample_frac: float = 0.02,
     min_cluster_size: int = 10,
@@ -161,13 +163,14 @@ def prepare_eval_sample(
     umap_n_components: int = 10,
     random_state: int = 42,
 ) -> pl.DataFrame:
-    """End-to-end: validate → cast HS codes to str → cluster → stratified sample.
+    """End-to-end: validate → cluster → stratified sample.
+
+    Only needs the text column for clustering. All other columns
+    (ground truth, metadata, etc.) are carried through untouched.
 
     Args:
-        df: Input DataFrame. Must contain text_col and truth_col.
+        df: Input DataFrame. Must contain text_col.
         text_col: Column with product descriptions (used for embedding).
-        truth_col: Column with ground truth HS codes. Cast to str to
-            preserve leading zeros (e.g. "0306" not 306).
         model: A loaded SentenceTransformer instance.
         sample_frac: Fraction to sample (e.g. 0.01 = 1%, 0.02 = 2%).
         min_cluster_size: Minimum points for HDBSCAN cluster formation.
@@ -178,24 +181,8 @@ def prepare_eval_sample(
     Returns:
         Sampled DataFrame with all original columns + ``cluster`` column.
     """
-    # validate
-    for col in (text_col, truth_col):
-        if col not in df.columns:
-            raise ValueError(f"Column '{col}' not found. Available: {df.columns}")
-
-    # cast truth column to string to preserve leading zeros
-    if df[truth_col].dtype != pl.String:
-        logger.info(f"Casting '{truth_col}' from {df[truth_col].dtype} to String")
-        df = df.with_columns(
-            pl.col(truth_col).cast(pl.String).str.zfill(4).alias(truth_col)
-        )
-
-    # drop nulls
-    before = len(df)
-    df = df.drop_nulls(subset=[text_col, truth_col])
-    dropped = before - len(df)
-    if dropped:
-        logger.info(f"Dropped {dropped} rows with null {text_col} or {truth_col}")
+    if text_col not in df.columns:
+        raise ValueError(f"Column '{text_col}' not found. Available: {df.columns}")
 
     # cluster
     df = assign_clusters(
