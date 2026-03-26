@@ -5,7 +5,6 @@
 - **tqdm**: `IProgress not found` warning. Fix with `pip install ipywidgets`.
 - **translators**: `SyntaxWarning: invalid escape sequence '\.'` in `server.py` and `server_async.py`. Bug in the `translators` package (unescaped regex). Harmless, needs upstream fix.
 - **hdbscan**: `SyntaxWarning: invalid escape sequence '\{'` in `robust_single_linkage_.py:175`. Unescaped LaTeX in a docstring. Harmless, needs upstream fix.
-- **umap**: `UserWarning: n_jobs value 1 overridden to 1 by setting random_state`. Harmless, just informational about parallelism being disabled when a seed is set.
 
 ## Gotchas
 

@@ -37,6 +37,7 @@ Input requirements:
 """
 
 import logging
+import warnings
 from typing import Any
 
 import numpy as np
@@ -47,6 +48,13 @@ from sentence_transformers import SentenceTransformer
 from umap import UMAP
 
 logger = logging.getLogger(__name__)
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"n_jobs value 1 overridden to 1 by setting random_state\..*",
+    category=UserWarning,
+    module="umap",
+)
 
 
 def _to_polars(df: Any) -> tuple[pl.DataFrame, bool]:

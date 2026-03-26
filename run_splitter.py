@@ -7,11 +7,19 @@ Usage:
 """
 
 import logging
+import warnings
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
 for name in ("httpx", "faiss.loader", "sentence_transformers", "numba"):
     logging.getLogger(name).setLevel(logging.WARNING)
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"n_jobs value 1 overridden to 1 by setting random_state\..*",
+    category=UserWarning,
+    module="umap",
+)
 
 import os
 
