@@ -17,6 +17,20 @@
 
 - README evaluation example only captures `codes` from `ClassificationResult` but drops `reason`, `descriptions`, `search_terms`, and `detected_language`. The example should show how to include at least `reason` in `results_df` so users know the reasoning is available.
 - README examples use Polars, but most users will expect pandas. Should provide pandas examples (or both).
+- `evaluation_report` output is hard to interpret. The "confusion matrix" is a full multi-class cross-tabulation (true chapter × predicted chapter), not a standard 2×2 correct/incorrect matrix. With small samples (e.g. 18 rows) and many classes (15+ chapters), the resulting sparse matrix is mostly zeros and not very useful. Consider a user-friendly summary instead, e.g.:
+
+1. **Plain counts**: "8/18 top-1 matches, 10/18 top-2 matches, 10/18 correct chapter"
+2. **Miss table**: Show only the rows that missed — product description, predicted code, truth code — so users can see where the classifier struggles.
+3. **2×2 confusion matrix** per level (code and chapter):
+
+```
+            Correct  Incorrect
+Top-1          8        10
+Top-2         10         8
+Chapter       10         8
+```
+
+This is far more intuitive than a sparse multi-class cross-tabulation at any sample size.
 
 ## Connection Errors
 
