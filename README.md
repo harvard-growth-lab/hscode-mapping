@@ -38,20 +38,11 @@ cp .env.example .env   # fill in API keys, Atlas DB credentials, and model choic
 
 ### 2. Setup
 
-Build the lookup index (one-time), load the classifier, and run a quick smoke test.
-
 ```python
 from hs_classifier import init_index, init_classifier, classify_row
 
 init_index()                     # one-time: build FAISS index from Atlas DB (skips if exists)
 classifier = init_classifier()   # load heavy resources (FAISS index, S-BERT model)
-
-# smoke test — classify a single row
-result = classify_row(
-    {"product_description": "frozen shrimp", "container_description": "20ft reefer"},
-    classifier,
-)
-print(result.codes[0], result.descriptions[0])
 ```
 
 ### 3. Create an eval sample
