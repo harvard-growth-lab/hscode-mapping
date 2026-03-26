@@ -44,7 +44,7 @@ init_index(force=True)        # rebuild from scratch
 # Load classifier (heavy resources: FAISS index, S-BERT model)
 classifier = init_classifier()
 
-# Classify a row
+# Classify a row — uses .env defaults
 row = {"product_description": "frozen shrimp", "container_description": "20ft reefer"}
 result = classify_row(row, classifier)
 
@@ -52,7 +52,18 @@ result.code_first    # e.g. "0306"
 result.desc_first    # "Crustaceans; ..."
 result.code_second   # e.g. "1605"
 result.reason        # LLM justification
+
+# Override model/retrieval params per call (for experiments, evals, etc.)
+result = classify_row(row, classifier,
+    search_term_model="google/gemini-2.5-flash-lite",
+    reranker_model="anthropic/claude-haiku-4-5-20251001",
+    temperature=0.2,
+    top_k_total=50,
+    top_k_bert=15,
+)
 ```
+
+See [`example.ipynb`](example.ipynb) for a full walkthrough including classification, splitting, and evaluation.
 
 ### CLI
 
@@ -62,9 +73,39 @@ uv run run_pipeline.py --row_index 5            # different row
 uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
 ```
 
+## Evaluation workflow
+
+The intended flow for evaluating and tuning the classifier:
+
+1. **Split** — Create a representative eval sample from your dataset using semantic clustering (S-BERT → UMAP → HDBSCAN → stratified sample):
+   ```bash
+   uv run run_splitter.py --csv_path data/raw/my_data.csv --sample_frac 0.05
+   ```
+   ```python
+   from hs_classifier.splitter import prepare_eval_sample
+   sample = prepare_eval_sample(df, text_col="product_description", model=embed_model, sample_frac=0.05)
+   ```
+
+2. **Label** — Add ground truth HS codes to the sample (manually or from existing labels).
+
+3. **Classify** — Run the classifier on the eval sample, overriding params to compare configurations:
+   ```python
+   for model in ["anthropic/claude-haiku-4-5-20251001", "google/gemini-2.5-flash-lite"]:
+       results = [classify_row(row, classifier, reranker_model=model) for row in sample_rows]
+   ```
+
+4. **Evaluate** — Compute metrics and generate a report:
+   ```python
+   from hs_classifier.evaluator import evaluation_report, report_to_markdown
+   report = evaluation_report(results_df, truth_col="hs_code")
+   print(report_to_markdown(report))
+   ```
+
+Metrics: top-1 accuracy (HS4), top-k accuracy (HS4), chapter accuracy (HS2), per-chapter breakdown, and chapter-level confusion matrix.
+
 ## Configuration
 
-All configuration lives in `.env` (see `.env.example` for annotated defaults).
+All configuration lives in `.env` (see `.env.example` for annotated defaults). Model and retrieval parameters can also be overridden per call via `classify_row()` arguments.
 
 ### Database
 
@@ -82,24 +123,25 @@ Install the extra for your provider (see [Installation](#installation)) and set 
 
 ### Models
 
-| Variable | Role | Default |
-|---|---|---|
-| `EMBEDDING_MODEL` | S-BERT model for encoding HS descriptions and search queries into vectors | `dell-research-harvard/lt-un-data-fine-fine-en` |
-| `SEARCH_TERM_MODEL` | LLM that generates 5-8 HS-vocabulary search terms from the product description | `google/gemini-2.5-flash-lite` |
-| `RERANKER_MODEL` | LLM that picks the top 2 HS codes from the retrieval shortlist | `google/gemini-2.5-flash-lite` |
+| Variable | Role | Overridable | Default |
+|---|---|---|---|
+| `EMBEDDING_MODEL` | S-BERT model for encoding HS descriptions and queries | No (rebuild index) | `dell-research-harvard/lt-un-data-fine-fine-en` |
+| `SEARCH_TERM_MODEL` | LLM that generates search terms from product descriptions | `search_term_model=` | `google/gemini-2.5-flash-lite` |
+| `RERANKER_MODEL` | LLM that picks the top 2 HS codes from candidates | `reranker_model=` | `google/gemini-2.5-flash-lite` |
+
+### Retrieval parameters
+
+| Variable | Overridable | Default | Description |
+|---|---|---|---|
+| `TOP_K_TOTAL` | `top_k_total=` | 25 | Total FAISS candidates retrieved across all searches. Higher = more candidates for the reranker (better recall, costlier reranking). |
+| `TOP_K_BERT` | `top_k_bert=` | 10 | How many of those go to the original query. The rest are split evenly across the LLM-generated search terms. Higher = more weight on the raw query vs generated terms. |
+| `LLM_TEMPERATURE` | `temperature=` | 0.1 | Temperature for search term generation and reranking (0.0 = deterministic, 1.0 = creative). |
 
 ### Other
 
 | Variable | Description |
 |---|---|
 | `HF_TOKEN` | Hugging Face token for downloading the S-BERT model |
-
-### Retrieval parameters
-
-| Variable | Default | Description |
-|---|---|---|
-| `TOP_K_TOTAL` | 25 | Total FAISS candidates retrieved across all searches. Higher = more candidates for the reranker (better recall, costlier reranking). |
-| `TOP_K_BERT` | 10 | How many of those go to the original query. The rest are split evenly across the LLM-generated search terms. Higher = more weight on the raw query vs generated terms. |
 
 ## How it works
 
@@ -144,17 +186,21 @@ The LLM receives the candidate shortlist and selects the top 2 HS codes with a s
 ## Project structure
 
 ```
+example.ipynb             # Full walkthrough: classify, split, evaluate
 run_init.py               # One-time setup: build lookup index from Atlas DB
-run_pipeline.py           # CLI wrapper for quick testing
+run_pipeline.py           # CLI wrapper for classification
+run_splitter.py           # CLI wrapper for eval sample generation
 
 hs_classifier/
-├── __init__.py           # init_index(), init_classifier(), and classify_row()
+├── __init__.py           # init_index(), init_classifier(), classify_row()
 ├── init_lookup_index.py  # DB connection, S-BERT encoding, save index parquet
 ├── build_query.py        # Build one classifier query from one raw row
 ├── translator.py         # Lingua language detection + Google translation backend
 ├── search_terms.py       # LLM search term generation (Instructor + Pydantic)
 ├── retrieval.py          # Load index parquet, FAISS search, aggregate and deduplicate
-└── reranker.py           # LLM reranking of candidates (Instructor + Pydantic)
+├── reranker.py           # LLM reranking of candidates (Instructor + Pydantic)
+├── splitter.py           # S-BERT + UMAP + HDBSCAN clustering, stratified sampling
+└── evaluator.py          # Classification metrics and markdown report generation
 
 data/
 ├── raw/                  # Sample CSV data (e.g. ecuador_sample.csv)
@@ -163,11 +209,10 @@ data/
 
 ## Future improvements
 
-1. **Evaluation pipeline:** Train/test split on labeled data to measure classification accuracy (top-1, top-k hit rate) and guide tuning of retrieval parameters, prompts, and model choices.
-2. **Configurable top-N results:** The reranker currently returns exactly 2 codes. Making this configurable (e.g. top 5) gives downstream consumers more options for filtering or ensembling.
-3. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
-4. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
-5. **Nice to have:**
+1. **Configurable top-N results:** The reranker currently returns exactly 2 codes. Making this configurable (e.g. top 5) gives downstream consumers more options for filtering or ensembling.
+2. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
+3. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
+4. **Nice to have:**
    - **Batch classification:** `classify_row()` processes one row at a time. A `classify_batch()` that batches LLM calls would be faster for bulk runs.
    - **DeepL for translation:** The current translator uses the `translators` package with the Google backend. DeepL (free plan available) may produce better results on trade/product descriptions.
    - **Vector DB:** FAISS works well at the current scale (~1,200 HS4 codes). A managed vector DB like Qdrant or LanceDB would only be worth it for persistence, filtering, or incremental updates at much larger scale.
