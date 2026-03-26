@@ -166,8 +166,9 @@ data/
 1. **Provider extras:** `anthropic` and `google-genai` are both hard dependencies today. Restructuring as optional extras (`pip install hs-classifier[anthropic]`) would keep installs lighter.
 2. **Evaluation pipeline:** Train/test split on labeled data to measure classification accuracy (top-1, top-k hit rate) and guide tuning of retrieval parameters, prompts, and model choices.
 3. **Configurable top-N results:** The reranker currently returns exactly 2 codes. Making this configurable (e.g. top 5) gives downstream consumers more options for filtering or ensembling.
-4. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
-5. **Nice to have:**
+4. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings (using the HS hierarchy in Atlas) would give more granular classification.
+6. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
+7. **Nice to have:**
    - **Batch classification:** `classify_row()` processes one row at a time. A `classify_batch()` that batches LLM calls would be faster for bulk runs.
    - **DeepL for translation:** The current translator uses the `translators` package with the Google backend. DeepL (free plan available) may produce better results on trade/product descriptions.
    - **Vector DB:** FAISS works well at the current scale (~1,200 HS4 codes). A managed vector DB like Qdrant or LanceDB would only be worth it for persistence, filtering, or incremental updates at much larger scale.
