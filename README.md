@@ -82,7 +82,7 @@ Open the sample CSV and add a ground truth `hs_code` column — either from exis
 Run the classifier on each labeled row, collect predictions alongside ground truth, and compute metrics.
 
 ```python
-from hs_classifier.evaluator import evaluation_report, report_to_markdown
+from hs_classifier.evaluator import evaluation_report
 
 labeled = pl.read_csv("data/raw/my_data_sample_2pct_labeled.csv")
 
@@ -97,7 +97,7 @@ for row in labeled.iter_rows(named=True):
 
 results_df = pl.DataFrame(results)
 report = evaluation_report(results_df, truth_col="code_true")
-print(report_to_markdown(report))
+print(report)  # top-1, top-k, chapter accuracy + confusion matrix
 ```
 
 ### 6. Tune and compare
