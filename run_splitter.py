@@ -34,7 +34,7 @@ def split(
     text_col: str = "product_description",
     sample_frac: float = 0.02,
     min_cluster_size: int = 10,
-    output_path: str | None = None,
+    output_dir: str = "data/eval_samples",
 ) -> None:
     """Cluster and sample a CSV for evaluation.
 
@@ -46,8 +46,8 @@ def split(
         text_col: Column with product descriptions to embed.
         sample_frac: Fraction to sample (e.g. 0.01 = 1%, 0.10 = 10%).
         min_cluster_size: Minimum points for HDBSCAN cluster formation.
-        output_path: Where to save the sample CSV. Defaults to
-            data/intermediate/eval_sample_<frac>.csv.
+        output_dir: Directory to save the sample CSV. Created if it
+            doesn't exist.
     """
     logger.info(f"Loading {csv_path}")
     df = pl.read_csv(csv_path)
@@ -64,12 +64,12 @@ def split(
         min_cluster_size=min_cluster_size,
     )
 
-    if output_path is None:
-        frac_str = f"{sample_frac:.0%}".replace("%", "pct")
-        out_dir = Path("data/intermediate")
-        out_dir.mkdir(parents=True, exist_ok=True)
-        output_path = str(out_dir / f"eval_sample_{frac_str}.csv")
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    frac_str = f"{sample_frac:.0%}".replace("%", "pct")
+    output_path = out_dir / f"eval_sample_{frac_str}.csv"
 
+    logger.info(f"Saving eval sample to {output_path}")
     sample.write_csv(output_path)
     logger.info(f"Saved {len(sample)} rows to {output_path}")
 
