@@ -32,76 +32,96 @@ Then configure `.env` with the matching API key and model strings (see `.env.exa
 cp .env.example .env  # fill in API keys, Atlas DB credentials, and model choices
 ```
 
-### As a package
+### 1. Setup
 
 ```python
 from hs_classifier import init_index, init_classifier, classify_row
 
-# One-time: build FAISS index from Atlas DB
-init_index()                  # skips if already built
-init_index(force=True)        # rebuild from scratch
+init_index()              # one-time: build FAISS index from Atlas DB (skips if exists)
+classifier = init_classifier()   # load heavy resources (FAISS index, S-BERT model)
+```
 
-# Load classifier (heavy resources: FAISS index, S-BERT model)
-classifier = init_classifier()
+### 2. Classify
 
-# Classify a row — uses .env defaults
+```python
 row = {"product_description": "frozen shrimp", "container_description": "20ft reefer"}
 result = classify_row(row, classifier)
 
-result.code_first    # e.g. "0306"
+result.code_first    # "0306"
 result.desc_first    # "Crustaceans; ..."
-result.code_second   # e.g. "1605"
+result.code_second   # "1605"
 result.reason        # LLM justification
-
-# Override model/retrieval params per call (for experiments, evals, etc.)
-result = classify_row(row, classifier,
-    search_term_model="google/gemini-2.5-flash-lite",
-    reranker_model="anthropic/claude-haiku-4-5-20251001",
-    temperature=0.2,
-    top_k_total=50,
-    top_k_bert=15,
-)
 ```
 
-See [`example.ipynb`](example.ipynb) for a full walkthrough including classification, splitting, and evaluation.
+### 3. Create an eval sample
+
+Take a representative slice of your dataset using semantic clustering (S-BERT → UMAP → HDBSCAN → stratified sample). Only the text column is used for clustering — everything else passes through.
+
+```python
+import polars as pl
+from sentence_transformers import SentenceTransformer
+from hs_classifier.splitter import prepare_eval_sample
+
+df = pl.read_csv("data/raw/my_data.csv")
+model = SentenceTransformer(os.environ["EMBEDDING_MODEL"], local_files_only=True)
+
+sample = prepare_eval_sample(df, text_col="product_description", model=model, sample_frac=0.02)
+sample.write_csv("data/raw/my_data_sample_2pct.csv")
+```
+
+### 4. Label the sample
+
+Add a ground truth HS code column to the sample — either from existing labels in your data, or by manually reviewing and annotating.
+
+### 5. Classify the sample and evaluate
+
+Run the classifier on each labeled row, collect predictions alongside ground truth, and compute metrics.
+
+```python
+from hs_classifier.evaluator import evaluation_report, report_to_markdown
+
+labeled = pl.read_csv("data/raw/my_data_sample_2pct_labeled.csv")
+rows = labeled.iter_rows(named=True)
+
+results = []
+for row in rows:
+    result = classify_row(row, classifier)
+    results.append({
+        "code_true": row["hs_code"],
+        "code_first": result.code_first,
+        "code_second": result.code_second,
+    })
+
+results_df = pl.DataFrame(results)
+report = evaluation_report(results_df, truth_col="code_true")
+print(report_to_markdown(report))
+```
+
+### 6. Tune and compare
+
+Override model and retrieval parameters per call to compare configurations — no need to edit `.env`.
+
+```python
+configs = [
+    {"reranker_model": "anthropic/claude-haiku-4-5-20251001", "top_k_total": 25},
+    {"reranker_model": "google/gemini-2.5-flash-lite", "top_k_total": 50},
+]
+for config in configs:
+    results = [classify_row(row, classifier, **config) for row in rows]
+    # ... evaluate each config
+```
+
+See [`example.ipynb`](example.ipynb) for a runnable version of this full workflow.
 
 ### CLI
 
 ```bash
-uv run run_pipeline.py                          # default: row 1 from ecuador_sample
+uv run run_pipeline.py                          # classify a single row
 uv run run_pipeline.py --row_index 5            # different row
 uv run run_pipeline.py --csv_path data/raw/other.csv --row_index 0
+
+uv run run_splitter.py --csv_path data/raw/my_data.csv --sample_frac 0.05  # create eval sample
 ```
-
-## Evaluation workflow
-
-The intended flow for evaluating and tuning the classifier:
-
-1. **Split** — Create a representative eval sample from your dataset using semantic clustering (S-BERT → UMAP → HDBSCAN → stratified sample):
-   ```bash
-   uv run run_splitter.py --csv_path data/raw/my_data.csv --sample_frac 0.05
-   ```
-   ```python
-   from hs_classifier.splitter import prepare_eval_sample
-   sample = prepare_eval_sample(df, text_col="product_description", model=embed_model, sample_frac=0.05)
-   ```
-
-2. **Label** — Add ground truth HS codes to the sample (manually or from existing labels).
-
-3. **Classify** — Run the classifier on the eval sample, overriding params to compare configurations:
-   ```python
-   for model in ["anthropic/claude-haiku-4-5-20251001", "google/gemini-2.5-flash-lite"]:
-       results = [classify_row(row, classifier, reranker_model=model) for row in sample_rows]
-   ```
-
-4. **Evaluate** — Compute metrics and generate a report:
-   ```python
-   from hs_classifier.evaluator import evaluation_report, report_to_markdown
-   report = evaluation_report(results_df, truth_col="hs_code")
-   print(report_to_markdown(report))
-   ```
-
-Metrics: top-1 accuracy (HS4), top-k accuracy (HS4), chapter accuracy (HS2), per-chapter breakdown, and chapter-level confusion matrix.
 
 ## Configuration
 
