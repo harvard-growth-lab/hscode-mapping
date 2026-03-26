@@ -2,19 +2,36 @@
 
 Takes a product description string and returns the best-matching Harmonized System (HS) trade codes.
 
+## Installation
+
+```bash
+pip install git+https://github.com/kad416/llm-linkage.git#subdirectory=panjiva-hscode
+```
+
+Or with uv:
+```bash
+uv add git+https://github.com/kad416/llm-linkage.git#subdirectory=panjiva-hscode
+```
+
 ## Quick start
 
 ```bash
-uv sync
 cp .env.example .env  # fill in API keys, Atlas DB credentials, and model choices
-uv run run_init.py    # one-time: build FAISS index from Atlas DB
 ```
 
-```python
-from hs_classifier import init_classifier, classify_row
+### As a package
 
+```python
+from hs_classifier import init_index, init_classifier, classify_row
+
+# One-time: build FAISS index from Atlas DB
+init_index()                  # skips if already built
+init_index(force=True)        # rebuild from scratch
+
+# Load classifier (heavy resources: FAISS index, S-BERT model)
 classifier = init_classifier()
 
+# Classify a row
 row = {"product_description": "frozen shrimp", "container_description": "20ft reefer"}
 result = classify_row(row, classifier)
 
@@ -126,7 +143,7 @@ run_init.py               # One-time setup: build lookup index from Atlas DB
 run_pipeline.py           # CLI wrapper for quick testing
 
 hs_classifier/
-├── __init__.py           # init_classifier() and classify_row()
+├── __init__.py           # init_index(), init_classifier(), and classify_row()
 ├── init_lookup_index.py  # DB connection, S-BERT encoding, save index parquet
 ├── build_query.py        # Build one classifier query from one raw row
 ├── translator.py         # Lingua language detection + Google translation backend

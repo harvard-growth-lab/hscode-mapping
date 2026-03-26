@@ -1,7 +1,12 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "hs-classifier"
 version = "0.1.0"
 description = "LLM-powered product-to-HS-code classification pipeline"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "faiss-cpu>=1.11.0",

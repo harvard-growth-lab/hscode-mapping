@@ -1,8 +1,9 @@
 """HS Code Text Classifier.
 
 Usage:
-    from hs_classifier import init_classifier, classify_row
+    from hs_classifier import init_index, init_classifier, classify_row
 
+    init_index()              # one-time: build lookup index from Atlas DB
     classifier = init_classifier()
     result = classify_row(row, classifier)
 """
@@ -23,6 +24,7 @@ load_dotenv()
 from sentence_transformers import SentenceTransformer
 
 from hs_classifier.build_query import build_query
+from hs_classifier.init_lookup_index import build_index, save_hs_chapters
 from hs_classifier.reranker import rerank_codes
 from hs_classifier.retrieval import load_index, multi_search
 from hs_classifier.search_terms import generate_search_terms, load_hs_chapters
@@ -52,6 +54,25 @@ class ClassificationResult:
     reason: str
     search_terms: list[str]
     detected_language: str
+
+
+def init_index(force: bool = False) -> None:
+    """Build the HS code lookup index and chapter reference.
+
+    Connects to the Atlas DB, generates S-BERT embeddings, and saves
+    parquet files to data/intermediate/. Skips if files already exist
+    unless force=True.
+
+    Must be run once before init_classifier().
+    """
+    save_hs_chapters(output_path=CHAPTERS_PATH, force=force)
+    build_index(
+        output_path=INDEX_PATH,
+        level=4,
+        model_name=EMBEDDING_MODEL,
+        force=force,
+    )
+    logger.info("Index initialization complete")
 
 
 def init_classifier() -> dict:
