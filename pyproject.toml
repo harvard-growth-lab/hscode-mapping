@@ -21,6 +21,7 @@ dependencies = [
     "instructor>=1.14.5",
     "jsonref>=1.1.0",
     "hdbscan>=0.8.41",
+    "umap-learn>=0.5.11",
 ]
 
 [project.optional-dependencies]
