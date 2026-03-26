@@ -4,14 +4,19 @@ Takes a product description string and returns the best-matching Harmonized Syst
 
 ## Installation
 
+Requires Python 3.12+. Install into a virtual environment:
+
 ```bash
-pip install git+https://github.com/kad416/llm-linkage.git#subdirectory=panjiva-hscode
+# uv (recommended)
+uv venv && source .venv/bin/activate
+uv add git+https://github.com/karandaryanani/panjiva-hscode.git
+
+# or pip
+python -m venv .venv && source .venv/bin/activate
+pip install git+https://github.com/karandaryanani/panjiva-hscode.git
 ```
 
-Or with uv:
-```bash
-uv add git+https://github.com/kad416/llm-linkage.git#subdirectory=panjiva-hscode
-```
+This installs `hs-classifier` and all its dependencies (faiss-cpu, instructor, polars, sentence-transformers, etc.).
 
 ## Quick start
 
