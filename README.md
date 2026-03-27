@@ -64,6 +64,8 @@ classifier = init_classifier(intermediate_data_dir="artifacts/hs")
 
 Before classifying your full dataset, take a small representative sample using semantic clustering (S-BERT → UMAP → HDBSCAN → stratified sample). Only the text column is used for clustering — everything else passes through.
 
+For external use, the examples in this README are pandas-first. Internally, the package uses Polars in several places for data handling, but public dataframe-facing utilities try to accept both pandas and Polars inputs.
+
 ```python
 import os
 import pandas as pd
@@ -151,24 +153,6 @@ Once you've picked the best configuration, run it on your full dataset.
 ```python
 import pandas as pd
 
-df = pd.read_csv("data/raw/my_data.csv")
-
-all_results = []
-for row in df.iter_rows(named=True):
-    result = classify_row(row, classifier, **best_config)
-    all_results.append({
-        **row,
-        **{f"hs_{i+1}": c for i, c in enumerate(result.codes)},
-        "reason": result.reason,
-    })
-
-classified = pd.DataFrame(all_results)
-classified.to_csv("data/raw/my_data_classified.csv", index=False)
-```
-
-Pandas version:
-
-```python
 df = pd.read_csv("data/raw/my_data.csv")
 
 all_results = []
