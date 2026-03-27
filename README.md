@@ -325,6 +325,7 @@ data/
 1. **HS4 → HS6 expansion:** The classifier currently returns 4-digit HS codes. A module to map these to 6-digit subheadings using the HS hierarchy and Atlas import/export weights to inform which subheading is most likely for a given product and trade context.
 2. **LLM abstraction layer:** LLM calls are currently inline in `search_terms.py` and `reranker.py`. Centralizing into a single `llm.py` module would make it easy to add new providers or swap backends without touching pipeline code.
 3. **Code tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
+4. **Prediction confidence via logprobs:** Capture token-level logprobs for the reranker's next-token predictions so each top HS code selection can be returned with an associated probability estimate for how likely that code is to be correct.
 
 **Nice to have:**
 - **Batch classification:** `classify_row()` processes one row at a time. A `classify_batch()` that batches LLM calls would be faster for bulk runs.
