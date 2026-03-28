@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "hs-classifier: LLM-based Harmonized System code classification"
+authors:
+  - family-names: Daryanani
+    given-names: Karan
+    affiliation: "Harvard's Growth Lab"
+repository-code: "https://github.com/harvard-growth-lab/hscode-mapping"
+license: MIT
+keywords:
+  - harmonized-system
+  - trade-classification
+  - hs-codes
+  - llm
+  - retrieval-augmented-generation
