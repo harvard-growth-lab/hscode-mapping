@@ -88,7 +88,7 @@ flowchart TD
 
 ### Eval sampling
 
-The eval splitter produces a representative sample for labeling and evaluation. The approach follows Dell (2025), who argues that embedding-based stratified sampling avoids two common pitfalls: keyword-based sampling, which fails to place positive probability on all instances; and active learning, which undersamples rare classes under severe class imbalance.
+The eval splitter produces a representative sample for labeling and evaluation. The approach follows [Dell (2025)](https://doi.org/10.1257/jel.20231668), who argues that embedding-based stratified sampling avoids two common pitfalls: keyword-based sampling, which fails to place positive probability on all instances; and active learning, which undersamples rare classes under severe class imbalance.
 
 ```mermaid
 flowchart LR
@@ -96,8 +96,6 @@ flowchart LR
 ```
 
 The result is a sample that covers the full diversity of your data, including rare product types that keyword filters or random sampling would miss.
-
-> Dell, Melissa. 2025. "Deep Learning for Economists." *Journal of Economic Literature* 63 (1): 5-58.
 
 ## Developer
 
@@ -143,10 +141,13 @@ Database and credential variables (`ATLAS_*`, `HF_TOKEN`, provider API keys) are
 
 ### Future improvements
 
-1. **HS4 → HS6 expansion:** Map 4-digit codes to 6-digit subheadings using the HS hierarchy and Atlas import/export weights.
-2. **LLM abstraction layer:** Centralize inline LLM calls from `search_terms.py` and `reranker.py` into a single `llm.py` module.
-3. **Tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
-4. **Prediction confidence via logprobs:** Capture token-level logprobs for the reranker's next-token predictions so each top HS code selection can be returned with an associated probability estimate.
+1. **Public Atlas API backend:** Replace the direct Atlas DB connection with the public Atlas API so users don't need database credentials.
+2. **Support other classification systems:** Extend beyond HS codes to support NAICS, PATSTAT, and other standard taxonomies.
+3. **Newer embeddings:** Update the vector index to use newer domain-specific embeddings such as [econ-embeddings](https://github.com/shreyasgm/econ-embeddings).
+4. **HS4 → HS6 expansion:** Map 4-digit codes to 6-digit subheadings using the HS hierarchy and Atlas import/export weights.
+5. **LLM abstraction layer:** Centralize inline LLM calls from `search_terms.py` and `reranker.py` into a single `llm.py` module.
+6. **Tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
+7. **Prediction confidence via logprobs:** Capture token-level logprobs for the reranker's next-token predictions so each top HS code selection can be returned with an associated probability estimate.
 
 **Nice to have:**
 - **Batch classification:** A `classify_batch()` that batches LLM calls for bulk runs.
