@@ -71,6 +71,7 @@ def generate_search_terms(
     terms = client.create(
         response_model=SearchTerms,
         messages=[{"role": "user", "content": prompt}],
+        model=model,
         temperature=temperature,
     )
 

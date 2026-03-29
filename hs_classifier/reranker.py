@@ -65,6 +65,7 @@ def rerank_codes(
     result = client.create(
         response_model=RerankResult,
         messages=[{"role": "user", "content": prompt}],
+        model=model,
         temperature=temperature,
     )
 
