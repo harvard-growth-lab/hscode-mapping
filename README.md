@@ -10,6 +10,13 @@ classifier = init_classifier()   # load FAISS index + S-BERT model
 
 result = classify_row({"product_description": "organic bananas"}, classifier)
 print(result)
+
+# retrieval-only ablation: skip the final reranking step
+fast_result = classify_row(
+    {"product_description": "organic bananas"},
+    classifier,
+    skip_reranking=True,
+)
 ```
 
 ```json
@@ -76,7 +83,7 @@ flowchart TD
 
 **Retrieval** — The original query and each generated term are embedded with S-BERT and searched against a FAISS index. Results are pooled and deduplicated.
 
-**Reranking** — The LLM receives the candidate shortlist and selects the top N codes with a short justification.
+**Reranking** — The LLM receives the candidate shortlist and selects the top N codes with a short justification. For ablations or fast retrieval-only runs, `classify_row(..., skip_reranking=True)` returns the top retrieval hits directly instead.
 
 ### Eval sampling
 
@@ -127,6 +134,8 @@ All configuration lives in `.env` (see [`.env.example`](.env.example) for annota
 | `TOP_K_BERT` | Candidates allocated to the raw query | `top_k_bert=` | 10 |
 | `LLM_TEMPERATURE` | Temperature for LLM calls | `temperature=` | 0.1 |
 | `INTERMEDIATE_DATA_DIR` | Directory for parquet artifacts | `intermediate_data_dir=` | `data/intermediate` |
+
+`classify_row()` also accepts `skip_reranking=True` to bypass the final reranker and return the top retrieval candidates directly while keeping the same result schema.
 
 Database and credential variables (`ATLAS_*`, `HF_TOKEN`, `OPENAI_API_KEY`) are documented in [`.env.example`](.env.example).
 

@@ -86,6 +86,16 @@ class ClassificationResult:
         return json.dumps(asdict(self), indent=2, ensure_ascii=False)
 
 
+def _shortlist_result(shortlist, top_n: int) -> dict[str, list[str] | str]:
+    """Return the top retrieval candidates without invoking the reranker."""
+    top = shortlist.head(max(int(top_n), 0))
+    return {
+        "codes": top["code"].to_list(),
+        "descriptions": top["description"].to_list(),
+        "reason": "Reranking skipped; returning top retrieval candidates.",
+    }
+
+
 def init_index(
     force: bool = False,
     intermediate_data_dir: str | Path | None = None,
@@ -138,6 +148,7 @@ def classify_row(
     top_k_total: int | None = None,
     top_k_bert: int | None = None,
     top_n: int = 2,
+    skip_reranking: bool = False,
 ) -> ClassificationResult:
     """Classify one CSV row using preloaded resources.
 
@@ -151,6 +162,7 @@ def classify_row(
         top_k_total: Total FAISS candidates to retrieve (default: TOP_K_TOTAL from .env).
         top_k_bert: Candidates allocated to the raw query (default: TOP_K_BERT from .env).
         top_n: Number of top HS codes to return (default: 2).
+        skip_reranking: If True, return the top retrieval hits without LLM reranking.
 
     Returns:
         ClassificationResult with top N codes, descriptions, reasoning,
@@ -194,15 +206,18 @@ def classify_row(
         top_k_bert=_top_k_bert,
     )
     logger.info(f"Retrieved {len(shortlist)} candidate codes")
-    # rerank candidates and pick top N
-    reranked = rerank_codes(
-        shortlist=shortlist,
-        query=english_text,
-        context=query_input.context,
-        model=_openai_model,
-        temperature=_temperature,
-        top_n=top_n,
-    )
+    # either rerank candidates or return the top retrieval hits directly
+    if skip_reranking:
+        reranked = _shortlist_result(shortlist, top_n)
+    else:
+        reranked = rerank_codes(
+            shortlist=shortlist,
+            query=english_text,
+            context=query_input.context,
+            model=_openai_model,
+            temperature=_temperature,
+            top_n=top_n,
+        )
 
     return ClassificationResult(
         codes=reranked["codes"],
