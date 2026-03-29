@@ -139,17 +139,8 @@ All configuration lives in `.env` (see [`.env.example`](.env.example) for annota
 
 Database and credential variables (`ATLAS_*`, `HF_TOKEN`, provider API keys) are documented in [`.env.example`](.env.example).
 
-### Future improvements
+### Nice to have
 
-1. **Public Atlas API backend:** Replace the direct Atlas DB connection with the public Atlas API so users don't need database credentials.
-2. **Support other classification systems:** Extend beyond HS codes to support NAICS, PATSTAT, and other standard taxonomies.
-3. **Newer embeddings:** Update the vector index to use newer domain-specific embeddings such as [econ-embeddings](https://github.com/shreyasgm/econ-embeddings).
-4. **HS4 → HS6 expansion:** Map 4-digit codes to 6-digit subheadings using the HS hierarchy and Atlas import/export weights.
-5. **LLM abstraction layer:** Centralize inline LLM calls from `search_terms.py` and `reranker.py` into a single `llm.py` module.
-6. **Tests:** Unit and integration tests for the classifier pipeline, evaluator, and splitter.
-7. **Prediction confidence via logprobs:** Capture token-level logprobs for the reranker's next-token predictions so each top HS code selection can be returned with an associated probability estimate.
-
-**Nice to have:**
+- **Support NAICS:** The core pipeline is taxonomy-agnostic in principle. Extending to NAICS would mainly require a new index. The [econ-embeddings](https://github.com/shreyasgm/econ-embeddings) work is relevant here — embeddings trained across economic taxonomies would enable better cross-domain retrieval and reranking.
 - **Batch classification:** A `classify_batch()` that batches LLM calls for bulk runs.
-- **DeepL for translation:** May produce better results on trade/product descriptions than the current Google backend.
 - **Vector DB:** FAISS works well at ~1,200 HS4 codes. A managed vector DB would only matter at much larger scale.
