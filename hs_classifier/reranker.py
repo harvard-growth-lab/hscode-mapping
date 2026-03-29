@@ -1,12 +1,12 @@
 """Rerank a shortlist of HS code candidates using an LLM.
 
-Uses Instructor with a Pydantic model for structured output.
-Provider-agnostic: works with OpenAI, Anthropic, Gemini, etc.
+Uses Instructor with OpenAI for structured output.
 """
 
-import instructor
 import polars as pl
 from pydantic import BaseModel, Field
+
+from hs_classifier.llm import get_openai_client
 
 
 class RerankResult(BaseModel):
@@ -40,13 +40,13 @@ def rerank_codes(
         shortlist: DataFrame of ~25 candidate HS codes from retrieval.
         query: Product name or description (in English).
         context: Shipping/packaging context.
-        model: Provider/model string, e.g. "google/gemini-2.5-flash-lite".
+        model: OpenAI model name, e.g. "gpt-5-nano".
         top_n: How many top codes to return (default 2).
 
     Returns:
         Dict with codes (list), descriptions (list), and reason (str).
     """
-    client = instructor.from_provider(model)
+    client = get_openai_client()
     formatted_codes = format_shortlist(shortlist)
 
     context_line = f"Shipping context: '{context}'\n" if context else ""

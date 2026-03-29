@@ -8,8 +8,6 @@ Usage:
 
     result = classify_row(row, classifier)                    # uses .env defaults
     result = classify_row(row, classifier,                    # override per call
-        search_term_model="google/gemini-2.5-flash-lite",
-        reranker_model="anthropic/claude-haiku-4-5-20251001",
         temperature=0.2,
         top_k_total=50,
     )
@@ -33,6 +31,7 @@ from sentence_transformers import SentenceTransformer
 
 from hs_classifier.build_query import build_query
 from hs_classifier.init_lookup_index import build_index, save_hs_chapters
+from hs_classifier.llm import get_openai_model
 from hs_classifier.reranker import rerank_codes
 from hs_classifier.retrieval import load_index, multi_search
 from hs_classifier.search_terms import generate_search_terms, load_hs_chapters
@@ -54,8 +53,7 @@ def _require_env(name: str) -> str:
 def _runtime_config() -> dict[str, str | int | float]:
     return {
         "embedding_model": _require_env("EMBEDDING_MODEL"),
-        "search_term_model": _require_env("SEARCH_TERM_MODEL"),
-        "reranker_model": _require_env("RERANKER_MODEL"),
+        "openai_model": get_openai_model(),
         "intermediate_data_dir": os.environ.get("INTERMEDIATE_DATA_DIR", "data/intermediate"),
         "top_k_total": int(os.environ.get("TOP_K_TOTAL", 25)),
         "top_k_bert": int(os.environ.get("TOP_K_BERT", 10)),
@@ -136,8 +134,6 @@ def init_classifier(
 def classify_row(
     row: dict,
     classifier: dict,
-    search_term_model: str | None = None,
-    reranker_model: str | None = None,
     temperature: float | None = None,
     top_k_total: int | None = None,
     top_k_bert: int | None = None,
@@ -151,8 +147,6 @@ def classify_row(
     Args:
         row: A single row from the CSV as a dict.
         classifier: Output of init_classifier().
-        search_term_model: LLM for search term generation (default: SEARCH_TERM_MODEL from .env).
-        reranker_model: LLM for reranking (default: RERANKER_MODEL from .env).
         temperature: LLM temperature (default: LLM_TEMPERATURE from .env).
         top_k_total: Total FAISS candidates to retrieve (default: TOP_K_TOTAL from .env).
         top_k_bert: Candidates allocated to the raw query (default: TOP_K_BERT from .env).
@@ -164,8 +158,7 @@ def classify_row(
     """
     config = _runtime_config()
     # resolve defaults from .env
-    _search_term_model = search_term_model or config["search_term_model"]
-    _reranker_model = reranker_model or config["reranker_model"]
+    _openai_model = config["openai_model"]
     _temperature = temperature if temperature is not None else config["llm_temperature"]
     _top_k_total = top_k_total if top_k_total is not None else config["top_k_total"]
     _top_k_bert = top_k_bert if top_k_bert is not None else config["top_k_bert"]
@@ -185,7 +178,7 @@ def classify_row(
         query=english_text,
         context=query_input.context,
         hs_chapters=classifier["hs_chapters"],
-        model=_search_term_model,
+        model=_openai_model,
         temperature=_temperature,
     )
     logger.info(f"Search terms: {terms}")
@@ -206,7 +199,7 @@ def classify_row(
         shortlist=shortlist,
         query=english_text,
         context=query_input.context,
-        model=_reranker_model,
+        model=_openai_model,
         temperature=_temperature,
         top_n=top_n,
     )

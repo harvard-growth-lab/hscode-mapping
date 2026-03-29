@@ -1,14 +1,14 @@
 """Generate HS-vocabulary search terms for a product description.
 
-Uses Instructor with a Pydantic model for structured output.
-Provider-agnostic: works with OpenAI, Anthropic, Gemini, etc.
+Uses Instructor with OpenAI for structured output.
 """
 
 from pathlib import Path
 
-import instructor
 import polars as pl
 from pydantic import BaseModel, Field
+
+from hs_classifier.llm import get_openai_client
 
 
 class SearchTerms(BaseModel):
@@ -46,12 +46,12 @@ def generate_search_terms(
         query: Product name or description (in English).
         context: Optional context about the product (container info, etc.).
         hs_chapters: List of HS2 chapter descriptions (97 entries) for guidance.
-        model: Provider/model string, e.g. "google/gemini-2.5-flash-lite".
+        model: OpenAI model name, e.g. "gpt-5-nano".
 
     Returns:
         List of search terms.
     """
-    client = instructor.from_provider(model)
+    client = get_openai_client()
 
     hs_list = "\n".join(f"- {ch}" for ch in hs_chapters)
 

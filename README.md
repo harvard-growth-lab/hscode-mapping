@@ -28,24 +28,16 @@ Requires Python 3.12+.
 
 ```bash
 uv venv && source .venv/bin/activate
-pip install "hs-classifier[google] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
-cp .env.example .env   # fill in API keys, Atlas DB credentials, and model choices
+pip install "hs-classifier @ git+https://github.com/karandaryanani/panjiva-hscode.git"
+cp .env.example .env   # fill in OpenAI, Atlas DB, and embedding settings
 ```
 
-Pick the extra that matches your LLM provider:
-
-| Extra | Provider | API key env var |
-|---|---|---|
-| `[anthropic]` | Anthropic | `ANTHROPIC_API_KEY` |
-| `[google]` | Google Gemini | `GOOGLE_API_KEY` |
-| `[openai]` | OpenAI | `OPENAI_API_KEY` |
-| `[cohere]` | Cohere | `COHERE_API_KEY` |
-| `[all]` | All of the above | — |
+The package now uses OpenAI for all LLM steps. Set `OPENAI_API_KEY` in your `.env`. The supported default model is `gpt-5-nano`.
 
 To run the [`example.ipynb`](example.ipynb) notebook, add the `notebook` extra:
 
 ```bash
-pip install "hs-classifier[google,notebook] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
+pip install "hs-classifier[notebook] @ git+https://github.com/karandaryanani/panjiva-hscode.git"
 ```
 
 ## Quick start
@@ -125,19 +117,18 @@ data/
 
 ### Configuration
 
-All configuration lives in `.env` (see [`.env.example`](.env.example) for annotated defaults). Model and retrieval parameters can also be overridden per call via `classify_row()` keyword arguments.
+All configuration lives in `.env` (see [`.env.example`](.env.example) for annotated defaults). Retrieval parameters can also be overridden per call via `classify_row()` keyword arguments.
 
 | Variable | Role | Per-call override | Default |
 |---|---|---|---|
 | `EMBEDDING_MODEL` | S-BERT model for encoding descriptions and queries | — (rebuild index) | `dell-research-harvard/lt-un-data-fine-fine-en` |
-| `SEARCH_TERM_MODEL` | LLM that generates search terms | `search_term_model=` | `google/gemini-2.5-flash-lite` |
-| `RERANKER_MODEL` | LLM that picks the top N codes from candidates | `reranker_model=` | `google/gemini-2.5-flash-lite` |
+| `OPENAI_MODEL` | OpenAI model used for search terms and reranking | — | `gpt-5-nano` |
 | `TOP_K_TOTAL` | Total FAISS candidates retrieved | `top_k_total=` | 25 |
 | `TOP_K_BERT` | Candidates allocated to the raw query | `top_k_bert=` | 10 |
 | `LLM_TEMPERATURE` | Temperature for LLM calls | `temperature=` | 0.1 |
 | `INTERMEDIATE_DATA_DIR` | Directory for parquet artifacts | `intermediate_data_dir=` | `data/intermediate` |
 
-Database and credential variables (`ATLAS_*`, `HF_TOKEN`, provider API keys) are documented in [`.env.example`](.env.example).
+Database and credential variables (`ATLAS_*`, `HF_TOKEN`, `OPENAI_API_KEY`) are documented in [`.env.example`](.env.example).
 
 ### Nice to have
 
